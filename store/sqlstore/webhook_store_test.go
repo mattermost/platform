@@ -11,4 +11,5 @@ import (
 
 func TestWebhookStore(t *testing.T) {
 	StoreTest(t, storetest.TestWebhookStore)
+	StoreTest(t, storetest.TestWebhookStoreSaveIncoming)
 }

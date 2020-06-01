@@ -16,18 +16,20 @@ const (
 )
 
 type IncomingWebhook struct {
-	Id            string `json:"id"`
-	CreateAt      int64  `json:"create_at"`
-	UpdateAt      int64  `json:"update_at"`
-	DeleteAt      int64  `json:"delete_at"`
-	UserId        string `json:"user_id"`
-	ChannelId     string `json:"channel_id"`
-	TeamId        string `json:"team_id"`
-	DisplayName   string `json:"display_name"`
-	Description   string `json:"description"`
-	Username      string `json:"username"`
-	IconURL       string `json:"icon_url"`
-	ChannelLocked bool   `json:"channel_locked"`
+	Id                string `json:"id"`
+	CreateAt          int64  `json:"create_at"`
+	UpdateAt          int64  `json:"update_at"`
+	DeleteAt          int64  `json:"delete_at"`
+	UserId            string `json:"user_id"`
+	ChannelId         string `json:"channel_id"`
+	TeamId            string `json:"team_id"`
+	DisplayName       string `json:"display_name"`
+	Description       string `json:"description"`
+	Username          string `json:"username"`
+	IconURL           string `json:"icon_url"`
+	ChannelLocked     bool   `json:"channel_locked"`
+	SignatureExpected bool   `json:"signature_on"`
+	SecretToken       string `json:"secret_token"`
 }
 
 type IncomingWebhookRequest struct {
@@ -67,7 +69,6 @@ func (o *IncomingWebhook) IsValid() *AppError {
 
 	if !IsValidId(o.Id) {
 		return NewAppError("IncomingWebhook.IsValid", "model.incoming_hook.id.app_error", nil, "", http.StatusBadRequest)
-
 	}
 
 	if o.CreateAt == 0 {
@@ -105,7 +106,6 @@ func (o *IncomingWebhook) IsValid() *AppError {
 	if len(o.IconURL) > 1024 {
 		return NewAppError("IncomingWebhook.IsValid", "model.incoming_hook.icon_url.app_error", nil, "", http.StatusBadRequest)
 	}
-
 	return nil
 }
 

@@ -6,6 +6,7 @@ package app
 import (
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -116,6 +117,49 @@ func TestCreateIncomingWebhookForChannel(t *testing.T) {
 				ChannelId:   th.BasicChannel.Id,
 				Username:    "valid",
 				IconURL:     "http://example.com/icon",
+			},
+		},
+
+		"Invalid, with username, post icon and bad SecretToken": {
+			EnableIncomingHooks:        true,
+			EnablePostUsernameOverride: true,
+			EnablePostIconOverride:     true,
+			IncomingWebhook: model.IncomingWebhook{
+				DisplayName:       "title",
+				Description:       "description",
+				ChannelId:         th.BasicChannel.Id,
+				Username:          "valid",
+				IconURL:           "http://example.com/icon",
+				SignatureExpected: true,
+			},
+
+			ExpectedError:           true,
+			ExpectedIncomingWebhook: nil,
+		},
+
+		"Valid, with username, post icon and signature": {
+			EnableIncomingHooks:        true,
+			EnablePostUsernameOverride: true,
+			EnablePostIconOverride:     true,
+			IncomingWebhook: model.IncomingWebhook{
+				DisplayName:       "title",
+				Description:       "description",
+				ChannelId:         th.BasicChannel.Id,
+				Username:          "valid",
+				IconURL:           "http://example.com/icon",
+				SignatureExpected: true,
+				SecretToken:       "12345612345612345612345612",
+			},
+
+			ExpectedError: false,
+			ExpectedIncomingWebhook: &model.IncomingWebhook{
+				DisplayName:       "title",
+				Description:       "description",
+				ChannelId:         th.BasicChannel.Id,
+				Username:          "valid",
+				IconURL:           "http://example.com/icon",
+				SignatureExpected: true,
+				SecretToken:       "me",
 			},
 		},
 	} {
@@ -738,9 +782,26 @@ func TestDoOutgoingWebhookRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		resp, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json")
+		resp, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json", "secret")
 		require.Nil(t, err)
+		assert.NotNil(t, resp)
+		assert.NotNil(t, resp.Text)
+		assert.Equal(t, "Hello, World!", *resp.Text)
+	})
 
+	t.Run("with HMAC headers", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			io.Copy(w, strings.NewReader(`{"text": "Hello, World!"}`))
+			w.Header().Set("Content-Type", "application/json")
+			bodyBytes, _ := ioutil.ReadAll(r.Body)
+			digest := model.GenerateHmacSignature(&bodyBytes, r.Header.Get("Mattermost-Timestamp"), "secret")
+			assert.Equal(t, digest, r.Header.Get("Mattermost-Signature"))
+
+		}))
+		defer server.Close()
+
+		resp, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(`{"text": "Hello, World!"}`), "application/json", "secret")
+		require.Nil(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Text)
 		assert.Equal(t, "Hello, World!", *resp.Text)
@@ -752,7 +813,7 @@ func TestDoOutgoingWebhookRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		_, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json")
+		_, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json", "secret")
 		require.NotNil(t, err)
 		require.IsType(t, &json.SyntaxError{}, err)
 	})
@@ -763,7 +824,7 @@ func TestDoOutgoingWebhookRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		_, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json")
+		_, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json", "secret")
 		require.NotNil(t, err)
 		require.Equal(t, io.ErrUnexpectedEOF, err)
 	})
@@ -774,7 +835,7 @@ func TestDoOutgoingWebhookRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		_, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json")
+		_, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json", "secret")
 		require.NotNil(t, err)
 		require.IsType(t, &json.SyntaxError{}, err)
 	})
@@ -794,7 +855,7 @@ func TestDoOutgoingWebhookRequest(t *testing.T) {
 			th.App.HTTPService().(*httpservice.HTTPServiceImpl).RequestTimeout = httpservice.RequestTimeout
 		}()
 
-		_, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json")
+		_, err := th.App.doOutgoingWebhookRequest(server.URL, strings.NewReader(""), "application/json", "secret")
 		require.NotNil(t, err)
 		require.IsType(t, &url.Error{}, err)
 	})

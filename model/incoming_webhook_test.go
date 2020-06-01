@@ -48,6 +48,7 @@ func TestIncomingWebhookIsValid(t *testing.T) {
 	require.Error(t, o.IsValid())
 
 	o.TeamId = NewId()
+	o.SecretToken = ""
 	require.Nil(t, o.IsValid())
 
 	o.DisplayName = strings.Repeat("1", 65)
@@ -73,6 +74,16 @@ func TestIncomingWebhookIsValid(t *testing.T) {
 
 	o.IconURL = strings.Repeat("1", 1024)
 	require.Nil(t, o.IsValid())
+
+	for _, tokenLength := range [3]int{1, 25, 27} {
+		o.SecretToken = NewRandomString(tokenLength)
+		require.Error(t, o.IsValid())
+	}
+
+	for _, token := range [2]string{"", NewRandomString(26)} {
+		o.SecretToken = token
+		require.Nil(t, o.IsValid())
+	}
 }
 
 func TestIncomingWebhookPreSave(t *testing.T) {

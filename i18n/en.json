@@ -1413,6 +1413,10 @@
     "translation": "Incoming webhooks have been disabled by the system admin."
   },
   {
+    "id": "api.incoming_webhook.invalid_secret_token.app_error",
+    "translation": "Invalid secrect token."
+  },
+  {
     "id": "api.incoming_webhook.invalid_username.app_error",
     "translation": "Invalid username."
   },
@@ -2891,8 +2895,36 @@
     "translation": "Either trigger_words or channel_id must be set."
   },
   {
+    "id": "api.webhook.incoming.empty_webhook.app_error",
+    "translation": "Webhook payload is empty or cannot be read."
+  },
+  {
     "id": "api.webhook.incoming.error",
     "translation": "Could not decode the multipart payload of incoming webhook."
+  },
+  {
+    "id": "api.webhook.incoming.invalid_hook_id.app_error",
+    "translation": "You posted to an invalid webhook URL."
+  },
+  {
+    "id": "api.webhook.incoming.invalid_signature.app_error",
+    "translation": "It's an invalid signature."
+  },
+  {
+    "id": "api.webhook.incoming.invalid_timestamp.app_error",
+    "translation": "It's an invalid timestamp."
+  },
+  {
+    "id": "api.webhook.incoming.invalid_webhook_Hmac.app_error",
+    "translation": "Your webhook signature failed to verify."
+  },
+  {
+    "id": "api.webhook.incoming.webhook_expired.app_error",
+    "translation": "Your webhook is expired."
+  },
+  {
+    "id": "api.webhook.invalid_content_type.app_error",
+    "translation": "Invalid content type."
   },
   {
     "id": "api.webhook.team_mismatch.app_error",
@@ -2901,6 +2933,10 @@
   {
     "id": "api.webhook.update_outgoing.intersect.app_error",
     "translation": "Outgoing webhooks from the same channel cannot have the same trigger words/callback URLs."
+  },
+  {
+    "id": "api.webhook.update_webhook.bad_secret_token.app_error",
+    "translation": "The updated secret token is not valid."
   },
   {
     "id": "api.websocket_handler.invalid_param.app_error",
@@ -5385,6 +5421,10 @@
   {
     "id": "model.incoming_hook.id.app_error",
     "translation": "Invalid Id."
+  },
+  {
+    "id": "model.incoming_hook.insufficient_header.app_error",
+    "translation": "Required headers are not supplied."
   },
   {
     "id": "model.incoming_hook.parse_data.app_error",

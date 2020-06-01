@@ -801,6 +801,13 @@ func upgradeDatabaseToVersion524(sqlStore SqlStore) {
 	sqlStore.GetMaster().Exec("UPDATE UserGroups SET Name = null, AllowReference = false")
 	sqlStore.AlterPrimaryKey("Reactions", []string{"PostId", "UserId", "EmojiName"})
 
+	sqlStore.CreateColumnIfNotExists("IncomingWebhooks", "SignatureExpected", "boolean", "boolean", "0")
+	sqlStore.CreateColumnIfNotExists("IncomingWebhooks", "SecretToken", "varchar(64)", "varchar(64)", "")
+
+	sqlStore.CreateColumnIfNotExists("OutgoingWebhooks", "Signed", "boolean", "boolean", "0")
+	sqlStore.CreateColumnIfNotExists("OutgoingWebhooks", "SecretToken", "varchar(64)", "varchar(64)", "")
+	sqlStore.CreateColumnIfNotExists("OutgoingWebhooks", "UpdateSecretToken", "boolean", "boolean", "0")
+
 	// 	saveSchemaVersion(sqlStore, VERSION_5_24_0)
 	// }
 }
