@@ -108,6 +108,7 @@ func TestChannelStore(t *testing.T, ss store.Store, s SqlSupplier) {
 	t.Run("GetSidebarCategories", func(t *testing.T) { testGetSidebarCategories(t, ss) })
 	t.Run("UpdateSidebarCategories", func(t *testing.T) { testUpdateSidebarCategories(t, ss, s) })
 	t.Run("DeleteSidebarCategory", func(t *testing.T) { testDeleteSidebarCategory(t, ss, s) })
+	t.Run("GetDirectChannelsForUser", func(t *testing.T) { testGetDirectChannelsForUser(t, ss) })
 }
 
 func testChannelStoreSave(t *testing.T, ss store.Store) {
@@ -8407,5 +8408,86 @@ func testDeleteSidebarCategory(t *testing.T, ss store.Store, s SqlSupplier) {
 
 		err = ss.Channel().DeleteSidebarCategory(res.Categories[2].Id)
 		assert.NotNil(t, err)
+	})
+}
+
+func testGetDirectChannelsForUser(t *testing.T, ss store.Store) {
+	teamID := model.NewId()
+
+	c1 := model.Channel{}
+	c1.TeamId = teamID
+	c1.DisplayName = "Different Name" + model.NewId()
+	c1.Name = "zz" + model.NewId() + "b"
+	c1.Type = model.CHANNEL_DIRECT
+
+	c2 := model.Channel{}
+	c2.TeamId = teamID
+	c2.DisplayName = "Different Name 1" + model.NewId()
+	c2.Name = "zz1" + model.NewId() + "c"
+	c2.Type = model.CHANNEL_DIRECT
+
+	u1 := &model.User{}
+	u1.Email = MakeEmail()
+	u1.Nickname = model.NewId()
+	_, err := ss.User().Save(u1)
+	require.Nil(t, err)
+
+	u2 := &model.User{}
+	u2.Email = MakeEmail()
+	u2.Nickname = model.NewId()
+	_, err = ss.User().Save(u2)
+	require.Nil(t, err)
+
+	u3 := &model.User{}
+	u3.Email = MakeEmail()
+	u3.Nickname = model.NewId()
+	_, err = ss.User().Save(u3)
+	require.Nil(t, err)
+
+	m1 := model.ChannelMember{}
+	m1.ChannelId = c1.Id
+	m1.UserId = u1.Id
+	m1.NotifyProps = model.GetDefaultChannelNotifyProps()
+
+	m2 := model.ChannelMember{}
+	m2.ChannelId = c1.Id
+	m2.UserId = u2.Id
+	m2.NotifyProps = model.GetDefaultChannelNotifyProps()
+
+	m3 := model.ChannelMember{}
+	m3.ChannelId = c2.Id
+	m3.UserId = u1.Id
+	m3.NotifyProps = model.GetDefaultChannelNotifyProps()
+
+	m4 := model.ChannelMember{}
+	m4.ChannelId = c2.Id
+	m4.UserId = u3.Id
+	m4.NotifyProps = model.GetDefaultChannelNotifyProps()
+
+	ss.Channel().SaveDirectChannel(&c1, &m1, &m2)
+	ss.Channel().SaveDirectChannel(&c2, &m3, &m4)
+
+	t.Run("direct messages for user `u1`", func(t *testing.T) {
+		directChannelsUser1, nErr := ss.Channel().GetDirectChannelsForUser(u1.Id)
+		require.Nil(t, nErr)
+		require.Len(t, directChannelsUser1, 2)
+
+		for _, item := range directChannelsUser1 {
+			require.Contains(t, []string{u3.Username, u2.Username}, item.DisplayName)
+		}
+	})
+
+	t.Run("direct messages for user `u2` & `u3`", func(t *testing.T) {
+		directChannelsUser2, nErr := ss.Channel().GetDirectChannelsForUser(u2.Id)
+		require.Nil(t, nErr)
+		require.Len(t, directChannelsUser2, 1)
+
+		require.Contains(t, directChannelsUser2[0].DisplayName, u1.Username)
+
+		directChannelsUser3, nErr := ss.Channel().GetDirectChannelsForUser(u3.Id)
+		require.Nil(t, nErr)
+		require.Len(t, directChannelsUser2, 1)
+
+		require.Contains(t, directChannelsUser3[0].DisplayName, u1.Username)
 	})
 }
