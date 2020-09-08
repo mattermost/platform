@@ -34,6 +34,7 @@ import (
 	"github.com/mattermost/mattermost-server/v5/model"
 	"github.com/mattermost/mattermost-server/v5/plugin"
 	"github.com/mattermost/mattermost-server/v5/services/filesstore"
+	"github.com/mattermost/mattermost-server/v5/services/previews"
 	"github.com/mattermost/mattermost-server/v5/store"
 	"github.com/mattermost/mattermost-server/v5/utils"
 )
@@ -406,6 +407,7 @@ func (a *App) UploadFiles(teamId string, channelId string, userId string, files 
 	previewPathList := []string{}
 	thumbnailPathList := []string{}
 	imageDataList := [][]byte{}
+	officeFilesList := []*model.FileInfo{}
 
 	for i, file := range files {
 		buf := bytes.NewBuffer(nil)
@@ -428,9 +430,13 @@ func (a *App) UploadFiles(teamId string, channelId string, userId string, files 
 		if len(clientIds) > 0 {
 			resStruct.ClientIds = append(resStruct.ClientIds, clientIds[i])
 		}
+		if info.PreviewPath != "" && *a.Config().ServiceSettings.EnableOfficeFilePreviews && info.IsMMPreviewSupported() {
+			officeFilesList = append(officeFilesList, info)
+		}
 	}
 
 	a.HandleImages(previewPathList, thumbnailPathList, imageDataList)
+	a.HandleOfficeFiles(officeFilesList)
 
 	return resStruct, nil
 }
@@ -448,12 +454,16 @@ func (a *App) UploadFile(data []byte, channelId string, filename string) (*model
 		return nil, appError
 	}
 
-	if info.PreviewPath != "" || info.ThumbnailPath != "" {
+	if (info.PreviewPath != "" || info.ThumbnailPath != "") && info.IsImage() {
 		previewPathList := []string{info.PreviewPath}
 		thumbnailPathList := []string{info.ThumbnailPath}
 		imageDataList := [][]byte{data}
 
 		a.HandleImages(previewPathList, thumbnailPathList, imageDataList)
+	}
+
+	if info.PreviewPath != "" && *a.Config().ServiceSettings.EnableOfficeFilePreviews && info.IsMMPreviewSupported() {
+		a.HandleOfficeFiles([]*model.FileInfo{info})
 	}
 
 	return info, nil
@@ -632,6 +642,22 @@ func (a *App) UploadFileX(channelId, name string, input io.Reader,
 		go func() {
 			t.postprocessImage()
 			wg.Done()
+		}()
+	}
+
+	if t.fileinfo.IsMMPreviewSupported() {
+		nameWithoutExtension := t.Name[:strings.LastIndex(t.Name, ".")]
+		t.fileinfo.PreviewPath = t.pathPrefix() + nameWithoutExtension + "_preview.pdf"
+	}
+
+	if !t.Raw && *a.Config().ServiceSettings.EnableOfficeFilePreviews && t.fileinfo.IsMMPreviewSupported() {
+		mmpreviewURL := *a.Config().ServiceSettings.MMPreviewURL
+		mmpreviewSecret := *a.Config().ServiceSettings.MMPreviewSecret
+		go func() {
+			err := previews.GeneratePreview(mmpreviewURL, mmpreviewSecret, t.fileinfo, t.newReader(), t.writeFile)
+			if err != nil {
+				mlog.Error("Unable to generate document preview", mlog.Err(err), mlog.String("fileId", t.fileinfo.Id))
+			}
 		}()
 	}
 
@@ -938,6 +964,11 @@ func (a *App) DoUploadFileExpectModification(now time.Time, rawTeamId string, ra
 		info.ThumbnailPath = pathPrefix + nameWithoutExtension + "_thumb.jpg"
 	}
 
+	if info.IsMMPreviewSupported() {
+		nameWithoutExtension := filename[:strings.LastIndex(filename, ".")]
+		info.PreviewPath = pathPrefix + nameWithoutExtension + "_preview.pdf"
+	}
+
 	if pluginsEnvironment := a.GetPluginsEnvironment(); pluginsEnvironment != nil {
 		var rejectionError *model.AppError
 		pluginContext := a.PluginContext()
@@ -999,6 +1030,34 @@ func (a *App) HandleImages(previewPathList []string, thumbnailPathList []string,
 		}
 	}
 	wg.Wait()
+}
+
+func (a *App) HandleOfficeFiles(infos []*model.FileInfo) error {
+	mmpreviewURL := *a.Config().ServiceSettings.MMPreviewURL
+	mmpreviewSecret := *a.Config().ServiceSettings.MMPreviewSecret
+	backend, err := a.FileBackend()
+	if err != nil {
+		return err
+	}
+	wg := new(sync.WaitGroup)
+
+	for i := range infos {
+		wg.Add(1)
+		go func(info *model.FileInfo) {
+			defer wg.Done()
+			fileReader, appErr := backend.Reader(info.Path)
+			if appErr != nil {
+				mlog.Error("Unable to generate document preview", mlog.Err(appErr), mlog.String("fileId", info.Id))
+				return
+			}
+			err := previews.GeneratePreview(mmpreviewURL, mmpreviewSecret, info, fileReader, a.WriteFile)
+			if err != nil {
+				mlog.Error("Unable to generate document preview", mlog.Err(err), mlog.String("fileId", info.Id))
+			}
+		}(infos[i])
+	}
+	wg.Wait()
+	return nil
 }
 
 func prepareImage(fileData []byte) (image.Image, int, int) {

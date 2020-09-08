@@ -26,6 +26,7 @@ const (
 
 	PREVIEW_IMAGE_TYPE   = "image/jpeg"
 	THUMBNAIL_IMAGE_TYPE = "image/jpeg"
+	PREVIEW_PDF_TYPE     = "application/pdf"
 )
 
 var UNSAFE_CONTENT_TYPES = [...]string{
@@ -599,19 +600,39 @@ func getFilePreview(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if info.PreviewPath == "" {
-		c.Err = model.NewAppError("getFilePreview", "api.file.get_file_preview.no_preview.app_error", nil, "file_id="+info.Id, http.StatusBadRequest)
-		return
+		if *c.App.Config().ServiceSettings.EnableOfficeFilePreviews && info.IsMMPreviewSupported() {
+			pathWithoutExtension := info.Path[:strings.LastIndex(info.Path, ".")]
+			info.PreviewPath = pathWithoutExtension + "_preview.pdf"
+		} else {
+			c.Err = model.NewAppError("getFilePreview", "api.file.get_file_preview.no_preview.app_error", nil, "file_id="+info.Id, http.StatusBadRequest)
+			return
+		}
+	}
+
+	contentType := PREVIEW_IMAGE_TYPE
+	if *c.App.Config().ServiceSettings.EnableOfficeFilePreviews && info.IsMMPreviewSupported() {
+		contentType = PREVIEW_PDF_TYPE
 	}
 
 	fileReader, err := c.App.FileReader(info.PreviewPath)
 	if err != nil {
-		c.Err = err
-		c.Err.StatusCode = http.StatusNotFound
-		return
+		if *c.App.Config().ServiceSettings.EnableOfficeFilePreviews && info.IsMMPreviewSupported() {
+			c.App.HandleOfficeFiles([]*model.FileInfo{info})
+			fileReader, err = c.App.FileReader(info.PreviewPath)
+			if err != nil {
+				c.Err = err
+				c.Err.StatusCode = http.StatusNotFound
+				return
+			}
+		} else {
+			c.Err = err
+			c.Err.StatusCode = http.StatusNotFound
+			return
+		}
 	}
 	defer fileReader.Close()
 
-	err = writeFileResponse(info.Name, PREVIEW_IMAGE_TYPE, 0, time.Unix(0, info.UpdateAt*int64(1000*1000)), *c.App.Config().ServiceSettings.WebserverMode, fileReader, forceDownload, w, r)
+	err = writeFileResponse(info.Name, contentType, 0, time.Unix(0, info.UpdateAt*int64(1000*1000)), *c.App.Config().ServiceSettings.WebserverMode, fileReader, forceDownload, w, r)
 	if err != nil {
 		c.Err = err
 		return

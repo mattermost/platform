@@ -133,6 +133,10 @@ func (fi *FileInfo) IsImage() bool {
 	return strings.HasPrefix(fi.MimeType, "image")
 }
 
+func (fi *FileInfo) IsMMPreviewSupported() bool {
+	return fi.Extension == "doc" || fi.Extension == "docx" || fi.Extension == "ppt" || fi.Extension == "pptx" || fi.Extension == "xls" || fi.Extension == "xlsx" || fi.Extension == "odt" || fi.Extension == "odp" || fi.Extension == "ods" || fi.Extension == "rtf"
+}
+
 func NewInfo(name string) *FileInfo {
 	info := &FileInfo{
 		Name: name,
