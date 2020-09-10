@@ -48,4 +48,5 @@ func testLicenseStoreGet(t *testing.T, ss store.Store) {
 
 	_, err = ss.License().Get("missing")
 	require.NotNil(t, err, "should fail on get license")
+	require.IsType(t, &store.ErrNotFound{}, err)
 }

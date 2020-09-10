@@ -5,6 +5,7 @@ package sqlstore
 
 import (
 	"context"
+	"database/sql"
 	dbsql "database/sql"
 	"encoding/json"
 	"errors"
@@ -18,6 +19,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/dyatlov/go-opengraph/opengraph"
 	"github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/mattermost/gorp"
 	"github.com/mattermost/mattermost-server/v5/einterfaces"
@@ -105,17 +107,52 @@ type SqlSupplierStores struct {
 type SqlSupplier struct {
 	// rrCounter and srCounter should be kept first.
 	// See https://github.com/mattermost/mattermost-server/v5/pull/7281
-	rrCounter      int64
-	srCounter      int64
-	master         *gorp.DbMap
-	replicas       []*gorp.DbMap
-	searchReplicas []*gorp.DbMap
-	stores         SqlSupplierStores
-	settings       *model.SqlSettings
-	lockedToMaster bool
-	context        context.Context
-	license        *model.License
-	licenseMutex   sync.Mutex
+	rrCounter       int64
+	srCounter       int64
+	master          *gorp.DbMap
+	replicas        []*gorp.DbMap
+	searchReplicas  []*gorp.DbMap
+	masterX         *SqlxWrapper
+	replicasX       []*SqlxWrapper
+	searchReplicasX []*SqlxWrapper
+	stores          SqlSupplierStores
+	settings        *model.SqlSettings
+	lockedToMaster  bool
+	context         context.Context
+	license         *model.License
+	licenseMutex    sync.Mutex
+}
+
+type SqlxWrapper struct {
+	*sqlx.DB
+}
+
+type sqlBuilder interface {
+	ToSql() (string, []interface{}, error)
+}
+
+func (dbw *SqlxWrapper) ExecFromQuery(query sqlBuilder) (sql.Result, error) {
+	queryString, args, err := query.ToSql()
+	if err != nil {
+		return nil, err
+	}
+	return dbw.Exec(queryString, args...)
+}
+
+func (dbw *SqlxWrapper) GetFromQuery(dest interface{}, query sqlBuilder) error {
+	queryString, args, err := query.ToSql()
+	if err != nil {
+		return err
+	}
+	return dbw.Get(dest, queryString, args...)
+}
+
+func (dbw *SqlxWrapper) SelectFromQuery(dest *interface{}, query sqlBuilder) error {
+	queryString, args, err := query.ToSql()
+	if err != nil {
+		return err
+	}
+	return dbw.Select(dest, queryString, args...)
 }
 
 type TraceOnAdapter struct{}
@@ -279,18 +316,32 @@ func (ss *SqlSupplier) Context() context.Context {
 
 func (ss *SqlSupplier) initConnection() {
 	ss.master = setupConnection("master", *ss.settings.DataSource, ss.settings)
+	ss.masterX = &SqlxWrapper{sqlx.NewDb(ss.master.Db, *ss.settings.DriverName)}
+	if *ss.settings.DriverName == model.DATABASE_DRIVER_MYSQL {
+		ss.masterX.MapperFunc(sqlxMapperIdentity)
+	}
 
 	if len(ss.settings.DataSourceReplicas) > 0 {
 		ss.replicas = make([]*gorp.DbMap, len(ss.settings.DataSourceReplicas))
+		ss.replicasX = make([]*SqlxWrapper, len(ss.settings.DataSourceReplicas))
 		for i, replica := range ss.settings.DataSourceReplicas {
 			ss.replicas[i] = setupConnection(fmt.Sprintf("replica-%v", i), replica, ss.settings)
+			ss.replicasX[i] = &SqlxWrapper{sqlx.NewDb(ss.replicas[i].Db, *ss.settings.DriverName)}
+			if *ss.settings.DriverName == model.DATABASE_DRIVER_MYSQL {
+				ss.replicasX[i].MapperFunc(sqlxMapperIdentity)
+			}
 		}
 	}
 
 	if len(ss.settings.DataSourceSearchReplicas) > 0 {
 		ss.searchReplicas = make([]*gorp.DbMap, len(ss.settings.DataSourceSearchReplicas))
+		ss.searchReplicasX = make([]*SqlxWrapper, len(ss.settings.DataSourceSearchReplicas))
 		for i, replica := range ss.settings.DataSourceSearchReplicas {
 			ss.searchReplicas[i] = setupConnection(fmt.Sprintf("search-replica-%v", i), replica, ss.settings)
+			ss.searchReplicasX[i] = &SqlxWrapper{sqlx.NewDb(ss.searchReplicas[i].Db, *ss.settings.DriverName)}
+			if *ss.settings.DriverName == model.DATABASE_DRIVER_MYSQL {
+				ss.searchReplicasX[i].MapperFunc(sqlxMapperIdentity)
+			}
 		}
 	}
 }
@@ -349,6 +400,36 @@ func (ss *SqlSupplier) GetReplica() *gorp.DbMap {
 
 	rrNum := atomic.AddInt64(&ss.rrCounter, 1) % int64(len(ss.replicas))
 	return ss.replicas[rrNum]
+}
+
+func sqlxMapperIdentity(fieldName string) string {
+	return fieldName
+}
+
+func (ss *SqlSupplier) GetMasterX() *SqlxWrapper {
+	return ss.masterX
+}
+
+func (ss *SqlSupplier) GetSearchReplicaX() *SqlxWrapper {
+	if ss.license == nil {
+		return ss.GetMasterX()
+	}
+
+	if len(ss.settings.DataSourceSearchReplicas) == 0 {
+		return ss.GetReplicaX()
+	}
+
+	rrNum := atomic.AddInt64(&ss.srCounter, 1) % int64(len(ss.searchReplicasX))
+	return ss.searchReplicasX[rrNum]
+}
+
+func (ss *SqlSupplier) GetReplicaX() *SqlxWrapper {
+	if len(ss.settings.DataSourceReplicas) == 0 || ss.lockedToMaster || ss.license == nil {
+		return ss.GetMasterX()
+	}
+
+	rrNum := atomic.AddInt64(&ss.rrCounter, 1) % int64(len(ss.replicasX))
+	return ss.replicasX[rrNum]
 }
 
 func (ss *SqlSupplier) TotalMasterDbConnections() int {

@@ -4,6 +4,8 @@
 package sqlstore
 
 import (
+	"database/sql"
+
 	"github.com/pkg/errors"
 
 	sq "github.com/Masterminds/squirrel"
@@ -44,19 +46,20 @@ func (ls SqlLicenseStore) Save(license *model.LicenseRecord) (*model.LicenseReco
 	if err := license.IsValid(); err != nil {
 		return nil, err
 	}
+
 	query := ls.getQueryBuilder().
 		Select("*").
 		From("Licenses").
 		Where(sq.Eq{"Id": license.Id})
-	queryString, args, err := query.ToSql()
-	if err != nil {
-		return nil, errors.Wrap(err, "license_tosql")
-	}
 	var storedLicense model.LicenseRecord
-	if err := ls.GetReplica().SelectOne(&storedLicense, queryString, args...); err != nil {
+	if err := ls.GetReplicaX().GetFromQuery(&storedLicense, query); err != nil {
 		// Only insert if not exists
-		if err := ls.GetMaster().Insert(license); err != nil {
-			return nil, errors.Wrapf(err, "failed to get License with licenseId=%s", license.Id)
+		insertQuery := ls.getQueryBuilder().
+			Insert("Licenses").
+			Columns("Id", "CreateAt", "Bytes").
+			Values(license.Id, license.CreateAt, license.Bytes)
+		if _, err := ls.GetMasterX().ExecFromQuery(insertQuery); err != nil {
+			return nil, errors.Wrapf(err, "failed to save License with licenseId=%s", license.Id)
 		}
 		return license, nil
 	}
@@ -67,12 +70,13 @@ func (ls SqlLicenseStore) Save(license *model.LicenseRecord) (*model.LicenseReco
 // If the license doesn't exist it returns a model.AppError with
 // http.StatusNotFound in the StatusCode field.
 func (ls SqlLicenseStore) Get(id string) (*model.LicenseRecord, error) {
-	obj, err := ls.GetReplica().Get(model.LicenseRecord{}, id)
-	if err != nil {
+	query := ls.getQueryBuilder().Select("*").From("Licenses").Where(sq.Eq{"Id": id})
+	var obj model.LicenseRecord
+	if err := ls.GetReplicaX().GetFromQuery(&obj, query); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, store.NewErrNotFound("License", id)
+		}
 		return nil, errors.Wrapf(err, "failed to get License with licenseId=%s", id)
 	}
-	if obj == nil {
-		return nil, store.NewErrNotFound("License", id)
-	}
-	return obj.(*model.LicenseRecord), nil
+	return &obj, nil
 }
