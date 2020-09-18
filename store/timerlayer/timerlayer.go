@@ -18,6 +18,7 @@ import (
 type TimerLayer struct {
 	store.Store
 	Metrics                   einterfaces.MetricsInterface
+	AtomicStore               store.AtomicStore
 	AuditStore                store.AuditStore
 	BotStore                  store.BotStore
 	ChannelStore              store.ChannelStore
@@ -50,6 +51,10 @@ type TimerLayer struct {
 	UserAccessTokenStore      store.UserAccessTokenStore
 	UserTermsOfServiceStore   store.UserTermsOfServiceStore
 	WebhookStore              store.WebhookStore
+}
+
+func (s *TimerLayer) Atomic() store.AtomicStore {
+	return s.AtomicStore
 }
 
 func (s *TimerLayer) Audit() store.AuditStore {
@@ -178,6 +183,11 @@ func (s *TimerLayer) UserTermsOfService() store.UserTermsOfServiceStore {
 
 func (s *TimerLayer) Webhook() store.WebhookStore {
 	return s.WebhookStore
+}
+
+type TimerLayerAtomicStore struct {
+	store.AtomicStore
+	Root *TimerLayer
 }
 
 type TimerLayerAuditStore struct {
@@ -338,6 +348,102 @@ type TimerLayerUserTermsOfServiceStore struct {
 type TimerLayerWebhookStore struct {
 	store.WebhookStore
 	Root *TimerLayer
+}
+
+func (s *TimerLayerAtomicStore) CompareAndDelete(key string, oldValue []byte) (bool, *model.AppError) {
+	start := timemodule.Now()
+
+	result, err := s.AtomicStore.CompareAndDelete(key, oldValue)
+
+	elapsed := float64(timemodule.Since(start)) / float64(timemodule.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("AtomicStore.CompareAndDelete", success, elapsed)
+	}
+	return result, err
+}
+
+func (s *TimerLayerAtomicStore) CompareAndSet(keyVal *model.AtomicKeyValue, oldValue []byte) (bool, *model.AppError) {
+	start := timemodule.Now()
+
+	result, err := s.AtomicStore.CompareAndSet(keyVal, oldValue)
+
+	elapsed := float64(timemodule.Since(start)) / float64(timemodule.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("AtomicStore.CompareAndSet", success, elapsed)
+	}
+	return result, err
+}
+
+func (s *TimerLayerAtomicStore) Delete(key string) *model.AppError {
+	start := timemodule.Now()
+
+	err := s.AtomicStore.Delete(key)
+
+	elapsed := float64(timemodule.Since(start)) / float64(timemodule.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("AtomicStore.Delete", success, elapsed)
+	}
+	return err
+}
+
+func (s *TimerLayerAtomicStore) DeleteAllExpired() *model.AppError {
+	start := timemodule.Now()
+
+	err := s.AtomicStore.DeleteAllExpired()
+
+	elapsed := float64(timemodule.Since(start)) / float64(timemodule.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("AtomicStore.DeleteAllExpired", success, elapsed)
+	}
+	return err
+}
+
+func (s *TimerLayerAtomicStore) Get(key string) (*model.AtomicKeyValue, *model.AppError) {
+	start := timemodule.Now()
+
+	result, err := s.AtomicStore.Get(key)
+
+	elapsed := float64(timemodule.Since(start)) / float64(timemodule.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("AtomicStore.Get", success, elapsed)
+	}
+	return result, err
+}
+
+func (s *TimerLayerAtomicStore) SaveOrUpdate(keyVal *model.AtomicKeyValue) (*model.AtomicKeyValue, *model.AppError) {
+	start := timemodule.Now()
+
+	result, err := s.AtomicStore.SaveOrUpdate(keyVal)
+
+	elapsed := float64(timemodule.Since(start)) / float64(timemodule.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("AtomicStore.SaveOrUpdate", success, elapsed)
+	}
+	return result, err
 }
 
 func (s *TimerLayerAuditStore) Get(user_id string, offset int, limit int) (model.Audits, error) {
@@ -8651,6 +8757,7 @@ func New(childStore store.Store, metrics einterfaces.MetricsInterface) *TimerLay
 		Metrics: metrics,
 	}
 
+	newStore.AtomicStore = &TimerLayerAtomicStore{AtomicStore: childStore.Atomic(), Root: &newStore}
 	newStore.AuditStore = &TimerLayerAuditStore{AuditStore: childStore.Audit(), Root: &newStore}
 	newStore.BotStore = &TimerLayerBotStore{BotStore: childStore.Bot(), Root: &newStore}
 	newStore.ChannelStore = &TimerLayerChannelStore{ChannelStore: childStore.Channel(), Root: &newStore}

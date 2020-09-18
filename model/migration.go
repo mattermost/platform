@@ -22,3 +22,13 @@ const (
 	MIGRATION_KEY_SIDEBAR_CATEGORIES_PHASE_2                  = "migration_sidebar_categories_phase_2"
 	MIGRATION_KEY_ADD_CONVERT_CHANNEL_PERMISSIONS             = "add_convert_channel_permissions"
 )
+
+type AsyncMigrationStatus string
+
+const (
+	MigrationStatusUnknown  AsyncMigrationStatus = ""
+	MigrationStatusRun      AsyncMigrationStatus = "run"      // migration should be run
+	MigrationStatusSkip     AsyncMigrationStatus = "skip"     // migration should be skipped (not sure if needed?)
+	MigrationStatusComplete AsyncMigrationStatus = "complete" // migration was already executed
+	MigrationStatusFailed   AsyncMigrationStatus = "failed"   // migration has failed
+)

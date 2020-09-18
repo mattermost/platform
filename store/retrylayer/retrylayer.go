@@ -20,6 +20,7 @@ const mySQLDeadlockCode = uint16(1213)
 
 type RetryLayer struct {
 	store.Store
+	AtomicStore               store.AtomicStore
 	AuditStore                store.AuditStore
 	BotStore                  store.BotStore
 	ChannelStore              store.ChannelStore
@@ -52,6 +53,10 @@ type RetryLayer struct {
 	UserAccessTokenStore      store.UserAccessTokenStore
 	UserTermsOfServiceStore   store.UserTermsOfServiceStore
 	WebhookStore              store.WebhookStore
+}
+
+func (s *RetryLayer) Atomic() store.AtomicStore {
+	return s.AtomicStore
 }
 
 func (s *RetryLayer) Audit() store.AuditStore {
@@ -180,6 +185,11 @@ func (s *RetryLayer) UserTermsOfService() store.UserTermsOfServiceStore {
 
 func (s *RetryLayer) Webhook() store.WebhookStore {
 	return s.WebhookStore
+}
+
+type RetryLayerAtomicStore struct {
+	store.AtomicStore
+	Root *RetryLayer
 }
 
 type RetryLayerAuditStore struct {
@@ -356,6 +366,42 @@ func isRepeatableError(err error) bool {
 		}
 	}
 	return false
+}
+
+func (s *RetryLayerAtomicStore) CompareAndDelete(key string, oldValue []byte) (bool, *model.AppError) {
+
+	return s.AtomicStore.CompareAndDelete(key, oldValue)
+
+}
+
+func (s *RetryLayerAtomicStore) CompareAndSet(keyVal *model.AtomicKeyValue, oldValue []byte) (bool, *model.AppError) {
+
+	return s.AtomicStore.CompareAndSet(keyVal, oldValue)
+
+}
+
+func (s *RetryLayerAtomicStore) Delete(key string) *model.AppError {
+
+	return s.AtomicStore.Delete(key)
+
+}
+
+func (s *RetryLayerAtomicStore) DeleteAllExpired() *model.AppError {
+
+	return s.AtomicStore.DeleteAllExpired()
+
+}
+
+func (s *RetryLayerAtomicStore) Get(key string) (*model.AtomicKeyValue, *model.AppError) {
+
+	return s.AtomicStore.Get(key)
+
+}
+
+func (s *RetryLayerAtomicStore) SaveOrUpdate(keyVal *model.AtomicKeyValue) (*model.AtomicKeyValue, *model.AppError) {
+
+	return s.AtomicStore.SaveOrUpdate(keyVal)
+
 }
 
 func (s *RetryLayerAuditStore) Get(user_id string, offset int, limit int) (model.Audits, error) {
@@ -8243,6 +8289,7 @@ func New(childStore store.Store) *RetryLayer {
 		Store: childStore,
 	}
 
+	newStore.AtomicStore = &RetryLayerAtomicStore{AtomicStore: childStore.Atomic(), Root: &newStore}
 	newStore.AuditStore = &RetryLayerAuditStore{AuditStore: childStore.Audit(), Root: &newStore}
 	newStore.BotStore = &RetryLayerBotStore{BotStore: childStore.Bot(), Root: &newStore}
 	newStore.ChannelStore = &RetryLayerChannelStore{ChannelStore: childStore.Channel(), Root: &newStore}

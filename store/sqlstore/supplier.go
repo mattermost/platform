@@ -101,6 +101,7 @@ type SqlSupplierStores struct {
 	group                store.GroupStore
 	UserTermsOfService   store.UserTermsOfServiceStore
 	linkMetadata         store.LinkMetadataStore
+	atomic               store.AtomicStore
 }
 
 type SqlSupplier struct {
@@ -114,6 +115,7 @@ type SqlSupplier struct {
 	stores         SqlSupplierStores
 	settings       *model.SqlSettings
 	lockedToMaster bool
+	runner         *MigrationRunner
 	context        context.Context
 	license        *model.License
 	licenseMutex   sync.RWMutex
@@ -170,6 +172,7 @@ func NewSqlSupplier(settings model.SqlSettings, metrics einterfaces.MetricsInter
 	supplier.stores.role = newSqlRoleStore(supplier)
 	supplier.stores.scheme = newSqlSchemeStore(supplier)
 	supplier.stores.group = newSqlGroupStore(supplier)
+	supplier.stores.atomic = newSqlAtomicStore(supplier)
 
 	err := supplier.GetMaster().CreateTablesIfNotExists()
 	if err != nil {
@@ -214,7 +217,14 @@ func NewSqlSupplier(settings model.SqlSettings, metrics einterfaces.MetricsInter
 	supplier.stores.group.(*SqlGroupStore).createIndexesIfNotExists()
 	supplier.stores.scheme.(*SqlSchemeStore).createIndexesIfNotExists()
 	supplier.stores.preference.(*SqlPreferenceStore).deleteUnusedFeatures()
+	supplier.stores.atomic.(*SqlAtomicStore).createIndexesIfNotExists()
 
+	runner, err := asyncMigrations(supplier)
+	if err != nil {
+		mlog.Critical("Async migrations error", mlog.Err(err))
+	} else {
+		supplier.runner = runner
+	}
 	return supplier
 }
 
@@ -1043,6 +1053,9 @@ func (ss *SqlSupplier) RecycleDBConnections(d time.Duration) {
 }
 
 func (ss *SqlSupplier) Close() {
+	if ss.runner != nil {
+		ss.runner.WaitWithTimeout(1 * time.Second)
+	}
 	ss.master.Db.Close()
 	for _, replica := range ss.replicas {
 		replica.Db.Close()
@@ -1183,6 +1196,10 @@ func (ss *SqlSupplier) Group() store.GroupStore {
 
 func (ss *SqlSupplier) LinkMetadata() store.LinkMetadataStore {
 	return ss.stores.linkMetadata
+}
+
+func (ss *SqlSupplier) Atomic() store.AtomicStore {
+	return ss.stores.atomic
 }
 
 func (ss *SqlSupplier) DropAllTables() {

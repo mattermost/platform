@@ -16,6 +16,7 @@ import (
 func genStore() *mocks.Store {
 	mock := &mocks.Store{}
 	mock.On("Audit").Return(&mocks.AuditStore{})
+	mock.On("Atomic").Return(&mocks.AtomicStore{})
 	mock.On("Bot").Return(&mocks.BotStore{})
 	mock.On("Channel").Return(&mocks.ChannelStore{})
 	mock.On("ChannelMemberHistory").Return(&mocks.ChannelMemberHistoryStore{})
