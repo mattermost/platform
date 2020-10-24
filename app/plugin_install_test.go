@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -294,4 +295,67 @@ func TestInstallPluginAlreadyActive(t *testing.T) {
 	require.NotNil(t, appError)
 	require.Nil(t, actualManifest)
 	require.Equal(t, "app.plugin.restart.app_error", appError.Id)
+}
+
+func TestRunWithCCReader(t *testing.T) {
+	const payload = "TEST"
+	failure := model.NewAppError("", "", nil, "test error", 500)
+
+	consume := func(in io.Reader) *model.AppError {
+		bb, err := ioutil.ReadAll(in)
+		require.NoError(t, err)
+		require.Equal(t, payload, string(bb))
+		return nil
+	}
+
+	quietConsume := func(in io.Reader) *model.AppError {
+		_, _ = ioutil.ReadAll(in)
+		return nil
+	}
+
+	consume1ThenFail := func(in io.Reader) *model.AppError {
+		bb := make([]byte, 1)
+		_, err := in.Read(bb)
+		require.NoError(t, err)
+		require.Equal(t, payload[:1], string(bb))
+		return failure
+	}
+
+	consumeAllThenFail := func(in io.Reader) *model.AppError {
+		bb, err := ioutil.ReadAll(in)
+		require.NoError(t, err)
+		require.Equal(t, payload, string(bb))
+		return failure
+	}
+
+	for _, tc := range []struct {
+		name          string
+		funcs         []ccReaderFunc
+		expectedError *model.AppError
+	}{
+		{
+			name:  "happy simple",
+			funcs: []ccReaderFunc{consume},
+		},
+		{
+			name:  "5 happy",
+			funcs: []ccReaderFunc{consume, consume, consume, consume, consume},
+		},
+		{
+			name:          "error after consume one",
+			funcs:         []ccReaderFunc{quietConsume, consume1ThenFail, quietConsume},
+			expectedError: failure,
+		},
+		{
+			name:          "error after consume all",
+			funcs:         []ccReaderFunc{consume, consumeAllThenFail, consume},
+			expectedError: failure,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var in io.Reader = bytes.NewReader([]byte(payload))
+			appErr := runWithCCReader(in, tc.funcs...)
+			require.Equal(t, tc.expectedError, appErr)
+		})
+	}
 }

@@ -5,6 +5,7 @@ package app
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -72,32 +73,70 @@ func (a *App) DeletePublicKey(name string) *model.AppError {
 	return nil
 }
 
+var errMatched = model.NewAppError("", "", nil, "matched", http.StatusInternalServerError)
+
 // VerifyPlugin checks that the given signature corresponds to the given plugin and matches a trusted certificate.
-func (a *App) VerifyPlugin(plugin, signature io.ReadSeeker) *model.AppError {
-	if err := verifySignature(bytes.NewReader(mattermostPluginPublicKey), plugin, signature); err == nil {
-		return nil
+func (a *App) VerifyPlugin(plugin io.Reader, signatureFile io.Reader) *model.AppError {
+	data, eee := ioutil.ReadAll(plugin)
+	a.Log().Warn(fmt.Sprintf("<><> VerifyPlugin 1: read %v bytes, error: %v\n", len(data), eee))
+	plugin = bytes.NewReader(data)
+
+	sig, err := ioutil.ReadAll(signatureFile)
+	if err != nil {
+		return model.NewAppError("VerifyPlugin", "app.plugin.marketplace_plugins.signature_not_found.app_error", nil, "", http.StatusInternalServerError)
 	}
-	publicKeys, appErr := a.GetPluginPublicKeyFiles()
+	matcher := func(pk []byte) ccReaderFunc {
+		return func(clone io.Reader) *model.AppError {
+			return verifySignatureMismatch(bytes.NewReader(pk), clone, bytes.NewReader(sig))
+		}
+	}
+
+	matchers := []ccReaderFunc{
+		matcher(mattermostPluginPublicKey),
+	}
+
+	pkFiles, appErr := a.GetPluginPublicKeyFiles()
 	if appErr != nil {
 		return appErr
 	}
-	for _, pk := range publicKeys {
-		pkBytes, appErr := a.GetPublicKey(pk)
+	for _, file := range pkFiles {
+		var data []byte
+		data, appErr = a.GetPublicKey(file)
 		if appErr != nil {
-			mlog.Error("Unable to get public key for ", mlog.String("filename", pk))
+			mlog.Error("Unable to get public key for ", mlog.String("filename", file))
 			continue
 		}
-		publicKey := bytes.NewReader(pkBytes)
-		plugin.Seek(0, 0)
-		signature.Seek(0, 0)
-		if err := verifySignature(publicKey, plugin, signature); err == nil {
-			return nil
-		}
+		matchers = append(matchers, matcher(data))
 	}
-	return model.NewAppError("VerifyPlugin", "api.plugin.verify_plugin.app_error", nil, "", http.StatusInternalServerError)
+
+	appErr = runWithCCReader(plugin, matchers...)
+	if appErr != errMatched {
+		if appErr != nil {
+			return appErr
+		}
+		return model.NewAppError("VerifyPlugin", "api.plugin.verify_plugin.app_error", nil, "signature did not match", http.StatusInternalServerError)
+	}
+
+	return nil
 }
 
-func verifySignature(publicKey, message, signatrue io.Reader) error {
+// verifySignatureMismatch is a wrapper to use with runWithCCREader,
+// concurrently. It reverses the logic, returning a nil error when there's no
+// match, and errMatched otherwise. Then, runWithCCReader can return a single
+// errMatched "error" if one match was successful.
+func verifySignatureMismatch(publicKey, signed, signatrue io.Reader) *model.AppError {
+	err := verifySignature(publicKey, signed, signatrue)
+	if err == nil {
+		return errMatched
+	}
+	return nil
+}
+
+func verifySignature(publicKey, signed, signatrue io.Reader) error {
+	data, eee := ioutil.ReadAll(signed)
+	mlog.Warn(fmt.Sprintf("<><> verifySignature 1: read %v bytes, error: %v\n", len(data), eee))
+	signed = bytes.NewReader(data)
+
 	pk, err := decodeIfArmored(publicKey)
 	if err != nil {
 		return errors.Wrap(err, "can't decode public key")
@@ -106,15 +145,15 @@ func verifySignature(publicKey, message, signatrue io.Reader) error {
 	if err != nil {
 		return errors.Wrap(err, "can't decode signature")
 	}
-	return verifyBinarySignature(pk, message, s)
+	return verifyBinarySignature(pk, signed, s)
 }
 
-func verifyBinarySignature(publicKey, signedFile, signature io.Reader) error {
+func verifyBinarySignature(publicKey, signed, signature io.Reader) error {
 	keyring, err := openpgp.ReadKeyRing(publicKey)
 	if err != nil {
 		return errors.Wrap(err, "can't read public key")
 	}
-	if _, err = openpgp.CheckDetachedSignature(keyring, signedFile, signature); err != nil {
+	if _, err = openpgp.CheckDetachedSignature(keyring, signed, signature); err != nil {
 		return errors.Wrap(err, "error while checking the signature")
 	}
 	return nil
