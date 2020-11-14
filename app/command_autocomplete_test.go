@@ -132,69 +132,164 @@ func TestParseInputTextArgument(t *testing.T) {
 }
 
 func TestParseNamedArguments(t *testing.T) {
-	argument := &model.AutocompleteArg{
+	argumentTypeText := &model.AutocompleteArg{
 		Name:     "name", //named
 		HelpText: "some_help",
 		Type:     model.AutocompleteArgTypeText,
 		Data:     &model.AutocompleteTextArg{Hint: "hint", Pattern: "pat"},
 	}
 
-	found, _, _, suggestion := parseNamedArgument(argument, "", "")
+	argumentTypeBool := &model.AutocompleteArg{
+		Name:     "name", //named
+		HelpText: "some_help",
+		Type:     model.AutocompleteArgTypeBool,
+		Data:     &model.AutocompleteTextArg{Hint: "hint", Pattern: "pat"},
+	}
+
+	argumentTypeBoolWithoutName := &model.AutocompleteArg{
+		Name:     "", //no name
+		HelpText: "some_help",
+		Type:     model.AutocompleteArgTypeBool,
+		Data:     &model.AutocompleteTextArg{Hint: "hint", Pattern: "pat"},
+	}
+
+	found, _, _, suggestion := parseNamedArgument(argumentTypeText, "", "")
 	assert.True(t, found)
 	assert.Equal(t, model.AutocompleteSuggestion{Complete: "--name ", Suggestion: "--name", Hint: "", Description: "some_help"}, suggestion)
 
-	found, _, _, suggestion = parseNamedArgument(argument, "", " ")
+	found, _, _, suggestion = parseNamedArgument(argumentTypeBool, "", "")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "--name true ", Suggestion: "true", Hint: "", Description: "some_help"}, suggestion)
+
+	found, _, _, suggestion = parseNamedArgument(argumentTypeBoolWithoutName, "", "")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "false ", Suggestion: "false", Hint: "", Description: "some_help"}, suggestion)
+
+	found, _, _, suggestion = parseNamedArgument(argumentTypeBoolWithoutName, "", " ")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "  false ", Suggestion: "false", Hint: "", Description: "some_help"}, suggestion)
+
+	found, _, _, suggestion = parseNamedArgument(argumentTypeText, "", " ")
 	assert.True(t, found)
 	assert.Equal(t, model.AutocompleteSuggestion{Complete: " --name ", Suggestion: "--name", Hint: "", Description: "some_help"}, suggestion)
 
-	found, parsed, toBeParsed, _ := parseNamedArgument(argument, "", "abc")
+	found, parsed, toBeParsed, _ := parseNamedArgument(argumentTypeBool, "", "abc")
 	assert.False(t, found)
 	assert.Equal(t, "abc", parsed)
 	assert.Equal(t, "", toBeParsed)
 
-	found, parsed, toBeParsed, suggestion = parseNamedArgument(argument, "", "-")
+	found, parsed, toBeParsed, suggestion = parseNamedArgument(argumentTypeBool, "", "-")
+	assert.True(t, found)
+	assert.Equal(t, "-", parsed)
+	assert.Equal(t, "", toBeParsed)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "--name true ", Suggestion: "true", Hint: "", Description: "some_help"}, suggestion)
+
+	found, parsed, toBeParsed, suggestion = parseNamedArgument(argumentTypeText, "", "-")
 	assert.True(t, found)
 	assert.Equal(t, "-", parsed)
 	assert.Equal(t, "", toBeParsed)
 	assert.Equal(t, model.AutocompleteSuggestion{Complete: "--name ", Suggestion: "--name", Hint: "", Description: "some_help"}, suggestion)
 
-	found, parsed, toBeParsed, suggestion = parseNamedArgument(argument, "", " -")
+	found, parsed, toBeParsed, suggestion = parseNamedArgument(argumentTypeBool, "", " -")
+	assert.True(t, found)
+	assert.Equal(t, " -", parsed)
+	assert.Equal(t, "", toBeParsed)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: " --name true ", Suggestion: "true", Hint: "", Description: "some_help"}, suggestion)
+
+	found, parsed, toBeParsed, suggestion = parseNamedArgument(argumentTypeText, "", " -")
 	assert.True(t, found)
 	assert.Equal(t, " -", parsed)
 	assert.Equal(t, "", toBeParsed)
 	assert.Equal(t, model.AutocompleteSuggestion{Complete: " --name ", Suggestion: "--name", Hint: "", Description: "some_help"}, suggestion)
 
-	found, parsed, toBeParsed, suggestion = parseNamedArgument(argument, "", "--name")
+	found, parsed, toBeParsed, suggestion = parseNamedArgument(argumentTypeBool, "", "--name")
+	assert.True(t, found)
+	assert.Equal(t, "--name", parsed)
+	assert.Equal(t, "", toBeParsed)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "--name true ", Suggestion: "true", Hint: "", Description: "some_help"}, suggestion)
+
+	found, parsed, toBeParsed, suggestion = parseNamedArgument(argumentTypeText, "", "--name")
 	assert.True(t, found)
 	assert.Equal(t, "--name", parsed)
 	assert.Equal(t, "", toBeParsed)
 	assert.Equal(t, model.AutocompleteSuggestion{Complete: "--name ", Suggestion: "--name", Hint: "", Description: "some_help"}, suggestion)
 
-	found, parsed, toBeParsed, _ = parseNamedArgument(argument, "", "--name bla")
+	found, parsed, toBeParsed, suggestion = parseNamedArgument(argumentTypeText, "--name", "")
+	assert.True(t, found)
+	assert.Equal(t, "--name", parsed)
+	assert.Equal(t, "", toBeParsed)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "--name--name ", Suggestion: "--name", Hint: "", Description: "some_help"}, suggestion)
+
+	found, parsed, toBeParsed, _ = parseNamedArgument(argumentTypeBool, "", "--name bla")
 	assert.False(t, found)
 	assert.Equal(t, "--name ", parsed)
 	assert.Equal(t, "bla", toBeParsed)
 
-	found, parsed, toBeParsed, _ = parseNamedArgument(argument, "", "--name bla gla")
+	found, parsed, toBeParsed, _ = parseNamedArgument(argumentTypeText, "", "--name bla")
+	assert.False(t, found)
+	assert.Equal(t, "--name ", parsed)
+	assert.Equal(t, "bla", toBeParsed)
+
+	found, parsed, toBeParsed, _ = parseNamedArgument(argumentTypeText, "", "--name bla gla")
 	assert.False(t, found)
 	assert.Equal(t, "--name ", parsed)
 	assert.Equal(t, "bla gla", toBeParsed)
 
-	found, parsed, toBeParsed, _ = parseNamedArgument(argument, "", "--name \"bla gla\"")
+	found, parsed, toBeParsed, _ = parseNamedArgument(argumentTypeText, "", "--name \"bla gla\"")
 	assert.False(t, found)
 	assert.Equal(t, "--name ", parsed)
 	assert.Equal(t, "\"bla gla\"", toBeParsed)
 
-	found, parsed, toBeParsed, _ = parseNamedArgument(argument, "", "--name \"bla gla\" ")
+	found, parsed, toBeParsed, _ = parseNamedArgument(argumentTypeText, "", "--name \"bla gla\" ")
 	assert.False(t, found)
 	assert.Equal(t, "--name ", parsed)
 	assert.Equal(t, "\"bla gla\" ", toBeParsed)
 
-	found, parsed, toBeParsed, _ = parseNamedArgument(argument, "", "bla")
+	found, parsed, toBeParsed, _ = parseNamedArgument(argumentTypeBool, "", "bla")
 	assert.False(t, found)
 	assert.Equal(t, "bla", parsed)
 	assert.Equal(t, "", toBeParsed)
 
+}
+
+func TestParseBoolArgument(t *testing.T) {
+	argument := &model.AutocompleteArg{
+		Name:     "", //positional
+		HelpText: "some_help",
+		Type:     model.AutocompleteArgTypeText,
+		Data:     &model.AutocompleteBoolArg{Hint: "hint", BoolValue: "BoolValue"},
+	}
+
+	found, _, _, suggestion := parseBoolArgument(argument, "", "")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
+
+	found, _, _, suggestion = parseBoolArgument(argument, "", " ")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: " ", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
+
+	found, _, _, suggestion = parseBoolArgument(argument, "", "tru")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "true", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
+
+	found, _, _, suggestion = parseBoolArgument(argument, "", "false")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "false", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
+
+	found, parsed, toBeParsed, _ := parseBoolArgument(argument, "", "true test_command")
+	assert.False(t, found)
+	assert.Equal(t, "true ", parsed)
+	assert.Equal(t, "test_command", toBeParsed)
+
+	found, parsed, toBeParsed, _ = parseBoolArgument(argument, "", "false test_command")
+	assert.False(t, found)
+	assert.Equal(t, "false ", parsed)
+	assert.Equal(t, "test_command", toBeParsed)
+
+	found, parsed, toBeParsed, _ = parseBoolArgument(argument, "", "abc ")
+	assert.False(t, found)
+	assert.Equal(t, "abc ", parsed)
+	assert.Equal(t, "", toBeParsed)
 }
 
 func TestSuggestions(t *testing.T) {
@@ -338,7 +433,7 @@ func TestCommandWithOptionalArgs(t *testing.T) {
 	assert.Equal(t, command.HelpText, suggestions[0].Description)
 
 	suggestions = th.App.getSuggestions(emptyCmdArgs, []*model.AutocompleteData{command}, "", "command ", model.SYSTEM_ADMIN_ROLE_ID)
-	assert.Len(t, suggestions, 4)
+	assert.Len(t, suggestions, 7)
 	assert.Equal(t, "command subcommand1", suggestions[0].Complete)
 	assert.Equal(t, "subcommand1", suggestions[0].Suggestion)
 	assert.Equal(t, "", suggestions[0].Hint)
@@ -504,6 +599,27 @@ func TestCommandWithOptionalArgs(t *testing.T) {
 	assert.Equal(t, "", suggestions[0].Suggestion)
 	assert.Equal(t, "message", suggestions[0].Hint)
 	assert.Equal(t, "help4", suggestions[0].Description)
+
+	suggestions = th.App.getSuggestions(emptyCmdArgs, []*model.AutocompleteData{command}, "", "command subcommand5 true", model.SYSTEM_ADMIN_ROLE_ID)
+	assert.Len(t, suggestions, 1)
+	assert.Equal(t, "command subcommand5 true", suggestions[0].Complete)
+	assert.Equal(t, "", suggestions[0].Suggestion)
+	assert.Equal(t, "", suggestions[0].Hint)
+	assert.Equal(t, "arg1", suggestions[0].Description)
+
+	suggestions = th.App.getSuggestions(emptyCmdArgs, []*model.AutocompleteData{command}, "", "command subcommand6 false", model.SYSTEM_ADMIN_ROLE_ID)
+	assert.Len(t, suggestions, 1)
+	assert.Equal(t, "command subcommand6 false", suggestions[0].Complete)
+	assert.Equal(t, "", suggestions[0].Suggestion)
+	assert.Equal(t, "", suggestions[0].Hint)
+	assert.Equal(t, "arg1", suggestions[0].Description)
+
+	suggestions = th.App.getSuggestions(emptyCmdArgs, []*model.AutocompleteData{command}, "", "command subcommand7 ", model.SYSTEM_ADMIN_ROLE_ID)
+	assert.Len(t, suggestions, 1)
+	assert.Equal(t, "command subcommand7 --name1 true ", suggestions[0].Complete)
+	assert.Equal(t, "true", suggestions[0].Suggestion)
+	assert.Equal(t, "", suggestions[0].Hint)
+	assert.Equal(t, "arg1", suggestions[0].Description)
 }
 
 func createCommandWithOptionalArgs() *model.AutocompleteData {
@@ -530,6 +646,15 @@ func createCommandWithOptionalArgs() *model.AutocompleteData {
 	}})
 	subcommand4.AddTextArgument("help4", "message", "")
 	command.AddCommand(subcommand4)
+	subCommand5 := model.NewAutocompleteData("subcommand5", "", "")
+	subCommand5.AddNamedBoolArgument("", "arg1", "", "true", false)
+	command.AddCommand(subCommand5)
+	subCommand6 := model.NewAutocompleteData("subcommand6", "", "")
+	subCommand6.AddNamedBoolArgument("", "arg1", "", "false", false)
+	command.AddCommand(subCommand6)
+	subCommand7 := model.NewAutocompleteData("subcommand7", "", "")
+	subCommand7.AddNamedBoolArgument("name1", "arg1", "", "false", false)
+	command.AddCommand(subCommand7)
 
 	return command
 }
