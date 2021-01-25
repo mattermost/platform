@@ -162,3 +162,10 @@ func (hooks *hooksTimerLayer) ReactionHasBeenRemoved(c *Context, reaction *model
 	hooks.hooksImpl.ReactionHasBeenRemoved(c, reaction)
 	hooks.recordTime(startTime, "ReactionHasBeenRemoved", true)
 }
+
+func (hooks *hooksTimerLayer) NotificationWillBeSent(c *Context, post *model.Post, mentions *model.ExplicitMentions) *model.ExplicitMentions {
+	startTime := timePkg.Now()
+	_returnsA := hooks.hooksImpl.NotificationWillBeSent(c, post, mentions)
+	hooks.recordTime(startTime, "NotificationWillBeSent", true)
+	return _returnsA
+}

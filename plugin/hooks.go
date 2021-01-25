@@ -35,6 +35,7 @@ const (
 	UserHasBeenCreatedId     = 17
 	ReactionHasBeenAddedId   = 18
 	ReactionHasBeenRemovedId = 19
+	NotificationWillBeSentId = 20
 	TotalHooksId             = iota
 )
 
@@ -209,4 +210,10 @@ type Hooks interface {
 	//
 	// Minimum server version: 5.30
 	ReactionHasBeenRemoved(c *Context, reaction *model.Reaction)
+
+	// NotificationWillBeSent is invoked before a notification is sent.
+	// To modify the notified user map, return the replacement map,
+	//
+	// Minimum server version: 5.31
+	NotificationWillBeSent(c *Context, post *model.Post, mentions *model.ExplicitMentions) *model.ExplicitMentions
 }

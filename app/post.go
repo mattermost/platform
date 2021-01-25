@@ -1384,13 +1384,13 @@ func (a *App) countThreadMentions(user *model.User, post *model.Post, teamId str
 		return 0, model.NewAppError("countMentionsFromPost", "app.channel.count_posts_since.app_error", nil, nErr.Error(), http.StatusInternalServerError)
 	}
 
-	mentions := getExplicitMentions(post, keywords, groups)
+	mentions := model.GetExplicitMentions(post, keywords, groups)
 	if _, ok := mentions.Mentions[user.Id]; ok {
 		count += 1
 	}
 
 	for _, p := range posts {
-		mentions = getExplicitMentions(p, keywords, groups)
+		mentions = model.GetExplicitMentions(p, keywords, groups)
 		if _, ok := mentions.Mentions[user.Id]; ok {
 			count += 1
 		}
@@ -1519,7 +1519,7 @@ func isPostMention(user *model.User, post *model.Post, keywords map[string][]str
 	}
 
 	// Check for keyword mentions
-	mentions := getExplicitMentions(post, keywords, make(map[string]*model.Group))
+	mentions := model.GetExplicitMentions(post, keywords, make(map[string]*model.Group))
 	if _, ok := mentions.Mentions[user.Id]; ok {
 		return true
 	}
