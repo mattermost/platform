@@ -94,7 +94,7 @@ func TestParseInputTextArgument(t *testing.T) {
 		Name:     "", //positional
 		HelpText: "some_help",
 		Type:     model.AutocompleteArgTypeText,
-		Data:     &model.AutocompleteTextArg{Hint: "hint", Pattern: "pat"},
+		Data:     &model.AutocompleteTextArg{Hint: "hint", Pattern: ""},
 	}
 
 	found, _, _, suggestion := parseInputTextArgument(argument, "", "")
@@ -132,6 +132,109 @@ func TestParseInputTextArgument(t *testing.T) {
 	assert.False(t, found)
 	assert.Equal(t, "\"abc def\"", parsed)
 	assert.Equal(t, "", toBeParsed)
+}
+
+func TestParseInputTextArgumentWithPattern(t *testing.T) {
+	argument := &model.AutocompleteArg{
+		Name:     "", //positional
+		HelpText: "some_help",
+		Type:     model.AutocompleteArgTypeText,
+		Data:     &model.AutocompleteTextArg{Hint: "hint", Pattern: `^MM-\d{5}$`},
+	}
+
+	found, _, _, suggestion := parseInputTextArgument(argument, "", "")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", " ")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: " ", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "abc")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "MM-1234")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "MM-123456")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "MM-a1234")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "M-12345")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "MM-25528")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "MM-25528", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
+
+	argument = &model.AutocompleteArg{
+		Name:     "", //positional
+		HelpText: "some_help",
+		Type:     model.AutocompleteArgTypeText,
+		Data:     &model.AutocompleteTextArg{Hint: "hint", Pattern: `^Issue ticket MM-\d{5}`},
+	}
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"MM-12345")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"issue")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"issue ticket")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"Issue ticket")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"Issue ticket MM-1234A")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"Issue ticket MM-12345")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "\"Issue ticket MM-12345", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
+
+	argument = &model.AutocompleteArg{
+		Name:     "", //positional
+		HelpText: "some_help",
+		Type:     model.AutocompleteArgTypeText,
+		Data:     &model.AutocompleteTextArg{Hint: "hint", Pattern: `MM-\d{5}`},
+	}
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"issue")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"issue ticket")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"Issue ticket")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"Issue ticket MM-1234A")
+	assert.False(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"MM-12345")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "\"MM-12345", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
+
+	found, _, _, suggestion = parseInputTextArgument(argument, "", "\"Issue ticket MM-12345")
+	assert.True(t, found)
+	assert.Equal(t, model.AutocompleteSuggestion{Complete: "\"Issue ticket MM-12345", Suggestion: "", Hint: "hint", Description: "some_help"}, suggestion)
 }
 
 func TestParseNamedArguments(t *testing.T) {
