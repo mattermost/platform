@@ -61,9 +61,9 @@ type EmailBatchingJob struct {
 	taskMutex            sync.Mutex
 }
 
-func NewEmailBatchingJob(es *EmailService, bufferSize int) *EmailBatchingJob {
+func NewEmailBatchingJob(es EmailServiceIface, bufferSize int) *EmailBatchingJob {
 	return &EmailBatchingJob{
-		server:               es.srv,
+		server:               es.ESrv(),
 		newNotifications:     make(chan *batchedNotification, bufferSize),
 		pendingNotifications: make(map[string][]*batchedNotification),
 	}
@@ -104,7 +104,7 @@ func (job *EmailBatchingJob) CheckPendingEmails() {
 
 	// it's a bit weird to pass the send email function through here, but it makes it so that we can test
 	// without actually sending emails
-	job.checkPendingNotifications(time.Now(), job.server.EmailService.sendBatchedEmailNotification)
+	job.checkPendingNotifications(time.Now(), job.server.EmailService.SendBatchedEmailNotification)
 
 	mlog.Debug("Email batching job ran. Some users still have notifications pending.", mlog.Int("number_of_users", len(job.pendingNotifications)))
 }
@@ -193,7 +193,7 @@ func (job *EmailBatchingJob) checkPendingNotifications(now time.Time, handler fu
 	}
 }
 
-func (es *EmailService) sendBatchedEmailNotification(userID string, notifications []*batchedNotification) {
+func (es *EmailService) SendBatchedEmailNotification(userID string, notifications []*batchedNotification) {
 	user, err := es.srv.Store.User().Get(context.Background(), userID)
 	if err != nil {
 		mlog.Warn("Unable to find recipient for batched email notification")
@@ -222,7 +222,7 @@ func (es *EmailService) sendBatchedEmailNotification(userID string, notification
 			emailNotificationContentsType = *es.srv.Config().EmailSettings.EmailNotificationContentsType
 		}
 
-		contents += es.renderBatchedPost(notification, channel, sender, *es.srv.Config().ServiceSettings.SiteURL, displayNameFormat, translateFunc, user.Locale, emailNotificationContentsType)
+		contents += es.RenderBatchedPost(notification, channel, sender, *es.srv.Config().ServiceSettings.SiteURL, displayNameFormat, translateFunc, user.Locale, emailNotificationContentsType)
 	}
 
 	tm := time.Unix(notifications[0].post.CreateAt/1000, 0)
@@ -234,23 +234,23 @@ func (es *EmailService) sendBatchedEmailNotification(userID string, notification
 		"Day":      tm.Day(),
 	})
 
-	body := es.newEmailTemplate("post_batched_body", user.Locale)
+	body := es.NewEmailTemplate("post_batched_body", user.Locale)
 	body.Props["SiteURL"] = *es.srv.Config().ServiceSettings.SiteURL
 	body.Props["Posts"] = template.HTML(contents)
 	body.Props["BodyText"] = translateFunc("api.email_batching.send_batched_email_notification.body_text", len(notifications))
 
-	if nErr := es.sendNotificationMail(user.Email, subject, body.Render()); nErr != nil {
+	if nErr := es.SendNotificationMail(user.Email, subject, body.Render()); nErr != nil {
 		mlog.Warn("Unable to send batched email notification", mlog.String("email", user.Email), mlog.Err(nErr))
 	}
 }
 
-func (es *EmailService) renderBatchedPost(notification *batchedNotification, channel *model.Channel, sender *model.User, siteURL string, displayNameFormat string, translateFunc i18n.TranslateFunc, userLocale string, emailNotificationContentsType string) string {
+func (es *EmailService) RenderBatchedPost(notification *batchedNotification, channel *model.Channel, sender *model.User, siteURL string, displayNameFormat string, translateFunc i18n.TranslateFunc, userLocale string, emailNotificationContentsType string) string {
 	// don't include message contents if email notification contents type is set to generic
 	var template *utils.HTMLTemplate
 	if emailNotificationContentsType == model.EMAIL_NOTIFICATION_CONTENTS_FULL {
-		template = es.newEmailTemplate("post_batched_post_full", userLocale)
+		template = es.NewEmailTemplate("post_batched_post_full", userLocale)
 	} else {
-		template = es.newEmailTemplate("post_batched_post_generic", userLocale)
+		template = es.NewEmailTemplate("post_batched_post_generic", userLocale)
 	}
 
 	template.Props["Button"] = translateFunc("api.email_batching.render_batched_post.go_to_post")
