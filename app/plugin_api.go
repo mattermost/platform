@@ -312,6 +312,14 @@ func (api *PluginAPI) UpdateUserStatus(userID, status string) (*model.Status, *m
 	return api.app.GetStatus(userID)
 }
 
+func (api *PluginAPI) UpdateUserCustomStatus(userID string, customStatus *model.CustomStatus) *model.AppError {
+	return api.app.SetCustomStatus(userID, customStatus)
+}
+
+func (api *PluginAPI) RemoveUserCustomStatus(userID string) *model.AppError {
+	return api.app.RemoveCustomStatus(userID)
+}
+
 func (api *PluginAPI) GetUsersInChannel(channelID, sortBy string, page, perPage int) ([]*model.User, *model.AppError) {
 	switch sortBy {
 	case model.CHANNEL_SORT_BY_USERNAME:
