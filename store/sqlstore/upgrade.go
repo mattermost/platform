@@ -914,7 +914,6 @@ func upgradeDatabaseToVersion535(sqlStore *SqlStore) {
 		uniquenessColumns = []string{"RemoteTeamId", "SiteUrl(168)"}
 	}
 	sqlStore.CreateUniqueCompositeIndexIfNotExists(RemoteClusterSiteURLUniqueIndex, "RemoteClusters", uniquenessColumns)
-	sqlStore.CreateColumnIfNotExists("SharedChannelUsers", "ChannelId", "VARCHAR(26)", "VARCHAR(26)", "")
 
 	rootCountMigration(sqlStore)
 
