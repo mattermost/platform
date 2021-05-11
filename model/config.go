@@ -293,6 +293,12 @@ type ServiceSettings struct {
 	IdleTimeout                                       *int     `access:"write_restrictable,cloud_restrictable"`
 	MaximumLoginAttempts                              *int     `access:"authentication_password,write_restrictable,cloud_restrictable"`
 	GoroutineHealthThreshold                          *int     `access:"write_restrictable,cloud_restrictable"` // telemetry: none
+	GoogleDeveloperKey                                *string  `access:"site,write_restrictable,cloud_restrictable"`
+	EnableOAuthServiceProvider                        *bool    `access:"integrations"`
+	EnableIncomingWebhooks                            *bool    `access:"integrations"`
+	EnableOutgoingWebhooks                            *bool    `access:"integrations"`
+	IncomingWebhooksTriggerOutgoingWebhooks           *bool    `access:"integrations"`
+	EnableCommands                                    *bool    `access:"integrations"`
 	EnableOAuthServiceProvider                        *bool    `access:"integrations_integration_management"`
 	EnableIncomingWebhooks                            *bool    `access:"integrations_integration_management"`
 	EnableOutgoingWebhooks                            *bool    `access:"integrations_integration_management"`
@@ -469,6 +475,10 @@ func (s *ServiceSettings) SetDefaults(isUpdate bool) {
 
 	if s.EnableOutgoingWebhooks == nil {
 		s.EnableOutgoingWebhooks = NewBool(true)
+	}
+
+	if s.IncomingWebhooksTriggerOutgoingWebhooks == nil {
+		s.IncomingWebhooksTriggerOutgoingWebhooks = NewBool(false)
 	}
 
 	if s.ConnectionSecurity == nil {
