@@ -36,6 +36,17 @@ func NewPluginAPI(a *App, manifest *model.Manifest) *PluginAPI {
 	}
 }
 
+func (api *PluginAPI) applyDefaultConfigValues(pluginConfig map[string]interface{}) {
+
+	if api.manifest.SettingsSchema == nil {
+		return
+	}
+
+	for _, settings := range api.manifest.SettingsSchema.Settings {
+		pluginConfig[strings.ToLower(settings.Key)] = settings.Default
+	}
+}
+
 func (api *PluginAPI) LoadPluginConfiguration(dest interface{}) error {
 	finalConfig := make(map[string]interface{})
 
@@ -97,29 +108,44 @@ func (api *PluginAPI) GetSession(sessionID string) (*model.Session, *model.AppEr
 }
 
 func (api *PluginAPI) GetConfig() *model.Config {
-	return api.app.GetSanitizedConfig()
+	cfg := api.app.GetSanitizedConfig()
+
+	pluginConfig := cfg.PluginSettings.Plugins[api.manifest.Id]
+	api.applyDefaultConfigValues(pluginConfig)
+
+	return cfg
 }
 
 // GetUnsanitizedConfig gets the configuration for a system admin without removing secrets.
+// Also it set the defaults in active config if values in provided config are not specifying there
 func (api *PluginAPI) GetUnsanitizedConfig() *model.Config {
-	return api.app.Config().Clone()
+	cfg := api.app.Config().Clone()
+
+	pluginConfig := cfg.PluginSettings.Plugins[api.manifest.Id]
+	api.applyDefaultConfigValues(pluginConfig)
+
+	return cfg
 }
 
 func (api *PluginAPI) SaveConfig(config *model.Config) *model.AppError {
 	return api.app.SaveConfig(config, true)
 }
 
+// Get plugin config with set the defaults for the active plugin
 func (api *PluginAPI) GetPluginConfig() map[string]interface{} {
 	cfg := api.app.GetSanitizedConfig()
 	if pluginConfig, isOk := cfg.PluginSettings.Plugins[api.manifest.Id]; isOk {
+		api.applyDefaultConfigValues(pluginConfig)
 		return pluginConfig
 	}
+
 	return map[string]interface{}{}
 }
 
 func (api *PluginAPI) SavePluginConfig(pluginConfig map[string]interface{}) *model.AppError {
 	cfg := api.app.GetSanitizedConfig()
 	cfg.PluginSettings.Plugins[api.manifest.Id] = pluginConfig
+	api.applyDefaultConfigValues(pluginConfig)
 	return api.app.SaveConfig(cfg, true)
 }
 

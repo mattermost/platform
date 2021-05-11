@@ -630,31 +630,103 @@ func TestPluginAPIGetPluginConfig(t *testing.T) {
 	th := Setup(t)
 	defer th.TearDown()
 
-	manifest := &model.Manifest{
-		Id: "pluginid",
-		SettingsSchema: &model.PluginSettingsSchema{
-			Settings: []*model.PluginSetting{
-				{Key: "MyStringSetting", Type: "text"},
-				{Key: "MyIntSetting", Type: "text"},
-				{Key: "MyBoolSetting", Type: "bool"},
-			},
-		},
+	type pluginTest struct {
+		name                           string
+		api                            *PluginAPI
+		manifest                       *model.Manifest
+		pluginConfigJsonString         string
+		expectedPluginConfigJsonString string
+		pluginConfig                   map[string]interface{}
+		actualConfig                   map[string]interface{}
+		expectedConfig                 map[string]interface{}
 	}
 
-	api := NewPluginAPI(th.App, manifest)
+	tests := []pluginTest{
+		{
+			name: "Plugin settings without default values provided in manifest",
+			manifest: &model.Manifest{
+				Id: "pluginid",
+				SettingsSchema: &model.PluginSettingsSchema{
+					Settings: []*model.PluginSetting{
+						{Key: "MyStringSetting", Type: "text"},
+						{Key: "MyBoolSetting", Type: "bool", Default: false},
+					},
+				},
+			},
+			pluginConfigJsonString:         `{"mystringsetting": "str", "myboolsetting": ""}`,
+			expectedPluginConfigJsonString: `{"mystringsetting": "str", "myboolsetting": false}`,
+		},
+		{
+			name: "Plugin settings with default value provided in manifest",
+			manifest: &model.Manifest{
+				Id: "pluginid",
+				SettingsSchema: &model.PluginSettingsSchema{
+					Settings: []*model.PluginSetting{
+						{Key: "MyStringSetting", Type: "text", Default: "defaultValue"},
+						{Key: "MyDefaultSetting", Type: "generated", Default: "defaultValue"},
+					},
+				},
+			},
+			pluginConfigJsonString:         `{"mystringsetting": "", "mydefaultsetting": ""}`,
+			expectedPluginConfigJsonString: `{"mystringsetting": "defaultValue", "mydefaultsetting": "defaultValue"}`,
+		},
+		{
+			name: "Plugin settings with empty json as a plugin config",
+			manifest: &model.Manifest{
+				Id: "pluginid",
+				SettingsSchema: &model.PluginSettingsSchema{
+					Settings: []*model.PluginSetting{
+						{Key: "MyStringSetting", Type: "text", Default: "defaultValue"},
+					},
+				},
+			},
+			pluginConfigJsonString:         `{}`,
+			expectedPluginConfigJsonString: `{"mystringsetting": "defaultValue"}`,
+		},
+		{
+			name: "Plugin settings with default value provided in manifest",
+			manifest: &model.Manifest{
+				Id: "pluginid",
+				SettingsSchema: &model.PluginSettingsSchema{
+					Settings: []*model.PluginSetting{
+						{Key: "MyStringSetting", Type: "text"},
+						{Key: "MyDropdownSetting", Type: "dropdown", Default: "defaultDropdownValue"},
+					},
+				},
+			},
+			pluginConfigJsonString:         `{"mystringsetting": "str", "mydropdownsetting": ""}`,
+			expectedPluginConfigJsonString: `{"mystringsetting": "str", "mydropdownsetting": "defaultDropdownValue"}`,
+		},
+		{
+			name: "Plugin settings with default value in manifest not override from provided configuration",
+			manifest: &model.Manifest{
+				Id: "pluginid",
+				SettingsSchema: &model.PluginSettingsSchema{
+					Settings: []*model.PluginSetting{
+						{Key: "MyStringSetting", Type: "text", Default: "defaultSettings"},
+					},
+				},
+			},
+			pluginConfigJsonString:         `{"mystringsetting": "str"}`,
+			expectedPluginConfigJsonString: `{"mystringsetting": "str"}`,
+		},
+	}
+	for _, testCase := range tests {
+		testCase.api = NewPluginAPI(th.App, testCase.manifest)
 
-	pluginConfigJsonString := `{"mystringsetting": "str", "myintsetting": 32, "myboolsetting": true}`
-	var pluginConfig map[string]interface{}
+		err := json.Unmarshal([]byte(testCase.pluginConfigJsonString), &testCase.pluginConfig)
+		require.NoError(t, err)
 
-	err := json.Unmarshal([]byte(pluginConfigJsonString), &pluginConfig)
-	require.NoError(t, err)
+		err = json.Unmarshal([]byte(testCase.expectedPluginConfigJsonString), &testCase.expectedConfig)
+		require.NoError(t, err)
 
-	th.App.UpdateConfig(func(cfg *model.Config) {
-		cfg.PluginSettings.Plugins["pluginid"] = pluginConfig
-	})
+		th.App.UpdateConfig(func(cfg *model.Config) {
+			cfg.PluginSettings.Plugins["pluginid"] = testCase.pluginConfig
+		})
 
-	savedPluginConfig := api.GetPluginConfig()
-	assert.Equal(t, pluginConfig, savedPluginConfig)
+		testCase.actualConfig = testCase.api.GetPluginConfig()
+		assert.Equal(t, testCase.expectedConfig, testCase.actualConfig, testCase.name)
+	}
 }
 
 func TestPluginAPILoadPluginConfiguration(t *testing.T) {
