@@ -136,10 +136,20 @@ func authorizeOAuthPage(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	// here we should check if the user is logged in
 	if c.AppContext.Session().UserId == "" {
+		requestURI := r.RequestURI
+		subpath, err := utils.GetSubpathFromConfig(c.App.Config())
+		// We will just log the error as warning and proceed to the login
+		if err != nil {
+			mlog.Warn(err.Error())
+		}
+		// If subpath exists then remove it from the requestURI
+		if err == nil && subpath != "" && subpath != "/" && strings.Index(requestURI, subpath) == 0 {
+			requestURI = requestURI[len(subpath):]
+		}
 		if loginHint == model.USER_AUTH_SERVICE_SAML {
-			http.Redirect(w, r, c.GetSiteURLHeader()+"/login/sso/saml?redirect_to="+url.QueryEscape(r.RequestURI), http.StatusFound)
+			http.Redirect(w, r, c.GetSiteURLHeader()+"/login/sso/saml?redirect_to="+url.QueryEscape(requestURI), http.StatusFound)
 		} else {
-			http.Redirect(w, r, c.GetSiteURLHeader()+"/login?redirect_to="+url.QueryEscape(r.RequestURI), http.StatusFound)
+			http.Redirect(w, r, c.GetSiteURLHeader()+"/login?redirect_to="+url.QueryEscape(requestURI), http.StatusFound)
 		}
 		return
 	}
