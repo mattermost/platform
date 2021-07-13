@@ -70,7 +70,6 @@ func (a *App) CreateCommandPost(c *request.Context, post *model.Post, teamID str
 	}
 
 	if (response.ResponseType == "" || response.ResponseType == model.CommandResponseTypeEphemeral) && (response.Text != "" || response.Attachments != nil) {
-		post.ParentId = ""
 		a.SendEphemeralPost(post.UserId, post)
 	}
 
@@ -566,7 +565,6 @@ func (a *App) HandleCommandResponsePost(c *request.Context, command *model.Comma
 	post := &model.Post{}
 	post.ChannelId = args.ChannelId
 	post.RootId = args.RootId
-	post.ParentId = args.ParentId
 	post.UserId = args.UserId
 	post.Type = response.Type
 	post.SetProps(response.Props)
