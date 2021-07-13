@@ -807,8 +807,6 @@ func precheckMigrationToVersion528(sqlStore *SqlStore) error {
 
 func upgradeDatabaseToVersion529(sqlStore *SqlStore) {
 	if shouldPerformUpgrade(sqlStore, Version5281, Version5290) {
-		sqlStore.AlterColumnTypeIfExists("SidebarCategories", "Id", "VARCHAR(128)", "VARCHAR(128)")
-		sqlStore.RemoveDefaultIfColumnExists("SidebarCategories", "Id")
 		sqlStore.AlterColumnTypeIfExists("SidebarChannels", "CategoryId", "VARCHAR(128)", "VARCHAR(128)")
 		sqlStore.RemoveDefaultIfColumnExists("SidebarChannels", "CategoryId")
 
@@ -835,8 +833,6 @@ func upgradeDatabaseToVersion5291(sqlStore *SqlStore) {
 func upgradeDatabaseToVersion530(sqlStore *SqlStore) {
 	if shouldPerformUpgrade(sqlStore, Version5291, Version5300) {
 		sqlStore.CreateColumnIfNotExistsNoDefault("FileInfo", "Content", "longtext", "text")
-
-		sqlStore.CreateColumnIfNotExists("SidebarCategories", "Muted", "tinyint(1)", "boolean", "0")
 
 		saveSchemaVersion(sqlStore, Version5300)
 	}
