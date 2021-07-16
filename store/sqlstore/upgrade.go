@@ -210,6 +210,7 @@ func upgradeDatabase(sqlStore *SqlStore, currentModelVersionString string) error
 	upgradeDatabaseToVersion535(sqlStore)
 	upgradeDatabaseToVersion536(sqlStore)
 	upgradeDatabaseToVersion537(sqlStore)
+	upgradeDatabaseToVersion600(sqlStore)
 
 	return nil
 }
@@ -1209,5 +1210,22 @@ func upgradeDatabaseToVersion537(sqlStore *SqlStore) {
 	sqlStore.CreateColumnIfNotExistsNoDefault("Status", "PrevStatus", "VARCHAR(32)", "VARCHAR(32)")
 
 	// saveSchemaVersion(sqlStore, Version5370)
+	// }
+}
+
+func upgradeDatabaseToVersion600(sqlStore *SqlStore) {
+	// if shouldPerformUpgrade(sqlStore, Version5380, Version600) {
+
+	sqlStore.AlterColumnTypeIfExists("ChannelMembers", "NotifyProps", "JSON", "jsonb")
+	sqlStore.AlterColumnTypeIfExists("Jobs", "Data", "JSON", "jsonb")
+	sqlStore.AlterColumnTypeIfExists("LinkMetadata", "Data", "JSON", "jsonb")
+	sqlStore.AlterColumnTypeIfExists("Posts", "Props", "JSON", "jsonb")
+	sqlStore.AlterColumnTypeIfExists("Sessions", "Props", "JSON", "jsonb")
+	sqlStore.AlterColumnTypeIfExists("Threads", "Participants", "JSON", "jsonb")
+	sqlStore.AlterColumnTypeIfExists("Users", "Props", "JSON", "jsonb")
+	sqlStore.AlterColumnTypeIfExists("Users", "NotifyProps", "JSON", "jsonb")
+	sqlStore.AlterColumnTypeIfExists("Users", "Timezone", "JSON", "jsonb")
+
+	// saveSchemaVersion(sqlStore, Version600)
 	// }
 }
