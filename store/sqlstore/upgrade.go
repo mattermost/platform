@@ -210,6 +210,7 @@ func upgradeDatabase(sqlStore *SqlStore, currentModelVersionString string) error
 	upgradeDatabaseToVersion535(sqlStore)
 	upgradeDatabaseToVersion536(sqlStore)
 	upgradeDatabaseToVersion537(sqlStore)
+	upgradeDatabaseToVersion600(sqlStore)
 
 	return nil
 }
@@ -1210,4 +1211,11 @@ func upgradeDatabaseToVersion537(sqlStore *SqlStore) {
 
 	// saveSchemaVersion(sqlStore, Version5370)
 	// }
+}
+
+func upgradeDatabaseToVersion600(sqlStore *SqlStore) {
+	sqlStore.GetMaster().ExecNoTimeout("UPDATE Posts SET RootId = ParentId WHERE RootId = '' AND RootId != ParentId")
+	sqlStore.RemoveColumnIfExists("Posts", "ParentId")
+	sqlStore.GetMaster().ExecNoTimeout("UPDATE CommandWebhooks SET RootId = ParentId WHERE RootId = '' AND RootId != ParentId")
+	sqlStore.RemoveColumnIfExists("CommandWebhooks", "ParentId")
 }
