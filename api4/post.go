@@ -126,6 +126,11 @@ func createEphemeralPost(c *Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	rp = model.AddPostActionCookies(rp, c.App.PostActionCookieSecret())
 	rp = c.App.PreparePostForClient(rp, true, false)
+	rp, err := c.App.SanitizePostMetadataForUser(rp, c.AppContext.Session().UserId)
+	if err != nil {
+		c.Err = err
+		return
+	}
 	w.Write([]byte(rp.ToJson()))
 }
 
@@ -212,6 +217,11 @@ func getPostsForChannel(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	c.App.AddCursorIdsForPostList(list, afterPost, beforePost, since, page, perPage, collapsedThreads)
 	clientPostList := c.App.PreparePostListForClient(list)
+	clientPostList, err = c.App.SanitizePostListMetadataForUser(clientPostList, c.AppContext.Session().UserId)
+	if err != nil {
+		c.Err = err
+		return
+	}
 
 	w.Write([]byte(clientPostList.ToJson()))
 }
@@ -268,6 +278,11 @@ func getPostsForChannelAroundLastUnread(c *Context, w http.ResponseWriter, r *ht
 	postList.PrevPostId = c.App.GetPrevPostIdFromPostList(postList, collapsedThreads)
 
 	clientPostList := c.App.PreparePostListForClient(postList)
+	clientPostList, err = c.App.SanitizePostListMetadataForUser(clientPostList, c.AppContext.Session().UserId)
+	if err != nil {
+		c.Err = err
+		return
+	}
 
 	if etag != "" {
 		w.Header().Set(model.HEADER_ETAG_SERVER, etag)
@@ -329,7 +344,13 @@ func getFlaggedPostsForUser(c *Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	pl.SortByCreateAt()
-	w.Write([]byte(c.App.PreparePostListForClient(pl).ToJson()))
+	clientPostList := c.App.PreparePostListForClient(pl)
+	clientPostList, err = c.App.SanitizePostListMetadataForUser(clientPostList, c.AppContext.Session().UserId)
+	if err != nil {
+		c.Err = err
+		return
+	}
+	w.Write([]byte(clientPostList.ToJson()))
 }
 
 func getPost(c *Context, w http.ResponseWriter, r *http.Request) {
@@ -363,6 +384,11 @@ func getPost(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	post = c.App.PreparePostForClient(post, false, false)
+	post, err = c.App.SanitizePostMetadataForUser(post, c.AppContext.Session().UserId)
+	if err != nil {
+		c.Err = err
+		return
+	}
 
 	if c.HandleEtag(post.Etag(), "Get Post", w, r) {
 		return
@@ -453,6 +479,11 @@ func getPostThread(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	clientPostList := c.App.PreparePostListForClient(list)
+	clientPostList, err = c.App.SanitizePostListMetadataForUser(clientPostList, c.AppContext.Session().UserId)
+	if err != nil {
+		c.Err = err
+		return
+	}
 
 	w.Header().Set(model.HEADER_ETAG_SERVER, clientPostList.Etag())
 
@@ -524,6 +555,11 @@ func searchPosts(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	clientPostList := c.App.PreparePostListForClient(results.PostList)
+	clientPostList, err = c.App.SanitizePostListMetadataForUser(clientPostList, c.AppContext.Session().UserId)
+	if err != nil {
+		c.Err = err
+		return
+	}
 
 	results = model.MakePostSearchResults(clientPostList, results.Matches)
 
