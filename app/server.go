@@ -138,6 +138,7 @@ type Server struct {
 	htmlTemplateWatcher     *templates.Container
 	seenPendingPostIdsCache cache.Cache
 	statusCache             cache.Cache
+	appsCache               map[string]*cache.Cache
 	configListenerId        string
 	licenseListenerId       string
 	logListenerId           string
@@ -344,6 +345,8 @@ func NewServer(options ...Option) (*Server, error) {
 	}); err != nil {
 		return nil, errors.Wrap(err, "Unable to create status cache")
 	}
+
+	s.createAppsCache()
 
 	s.createPushNotificationsHub()
 
@@ -2134,6 +2137,10 @@ func (s *Server) SetSharedChannelSyncService(sharedChannelService SharedChannelS
 	s.serviceMux.Lock()
 	defer s.serviceMux.Unlock()
 	s.sharedChannelService = sharedChannelService
+}
+
+func (s *Server) createAppsCache() {
+	s.appsCache = map[string]*cache.Cache{}
 }
 
 func (a *App) GenerateSupportPacket() []model.FileData {
