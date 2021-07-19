@@ -11,6 +11,8 @@ import (
 	"github.com/mattermost/mattermost-server/v5/model"
 	"github.com/mattermost/mattermost-server/v5/shared/mlog"
 	"github.com/mattermost/mattermost-server/v5/store"
+
+	"time"
 )
 
 func (a *App) AddStatusCacheSkipClusterSend(status *model.Status) {
@@ -246,7 +248,6 @@ func (a *App) SetStatusOffline(userID string, manual bool) {
 	}
 
 	status = &model.Status{UserId: userID, Status: model.STATUS_OFFLINE, Manual: manual, LastActivityAt: model.GetMillis(), ActiveChannel: ""}
-
 	a.SaveAndBroadcastStatus(status)
 }
 
@@ -278,6 +279,111 @@ func (a *App) SetStatusAwayIfNeeded(userID string, manual bool) {
 	status.Status = model.STATUS_AWAY
 	status.Manual = manual
 	status.ActiveChannel = ""
+
+	a.SaveAndBroadcastStatus(status)
+}
+
+func (a *App) SetStatusDoNotDisturbSchedule(userId, currentDayOfTheWeek, currentTime string) {
+	statusSchedule, err := a.GetStatusSchedule(userId)
+
+	if err != nil {
+		return
+	}
+	startTime := ""
+	endTime := ""
+
+	switch currentDayOfTheWeek {
+	case "Mon":
+		startTime = statusSchedule.MondayStart
+		endTime = statusSchedule.MondayEnd
+	case "Tue":
+		startTime = statusSchedule.TuesdayStart
+		endTime = statusSchedule.TuesdayEnd
+	case "Wed":
+		startTime = statusSchedule.WednesdayStart
+		endTime = statusSchedule.WednesdayEnd
+	case "Thu":
+		startTime = statusSchedule.ThursdayStart
+		endTime = statusSchedule.ThursdayEnd
+	case "Fri":
+		startTime = statusSchedule.FridayStart
+		endTime = statusSchedule.FridayEnd
+	case "Sat":
+		startTime = statusSchedule.SaturdayStart
+		endTime = statusSchedule.SaturdayEnd
+	case "Sun":
+		startTime = statusSchedule.SundayStart
+		endTime = statusSchedule.SundayEnd
+	}
+
+	if startTime == "" && endTime == "" {
+		return
+	}
+
+	newLayout := "15:04"
+	check, _ := time.Parse(newLayout, currentTime)
+	start, _ := time.Parse(newLayout, startTime)
+	end, _ := time.Parse(newLayout, endTime)
+
+	if a.InTimeSpan(start, end, check) {
+		a.SetStatusOnline(userId, true)
+	} else {
+		a.SetStatusDoNotDisturbScheduled(userId)
+	}
+}
+
+func (a *App) InTimeSpan(start, end, check time.Time) bool {
+	if check.After(end) {
+		return false
+	}
+	if end.After(start) {
+		return check.After(start)
+	}
+	return check.Before(start)
+}
+
+func (a *App) SetStatusSchedule(userId, mondayStart, mondayEnd, tuesdayStart, tuesdayEnd, wednesdayStart, wednesdayEnd, thursdayStart, thursdayEnd, fridayStart, fridayEnd, saturdayStart, saturdayEnd, sundayStart, sundayEnd string, mode int64) {
+	if !*a.Config().ServiceSettings.EnableUserStatuses {
+		return
+	}
+	statusSchedule, err := a.GetStatusSchedule(userId)
+
+	if err != nil {
+		statusSchedule = &model.StatusSchedule{UserId: userId}
+	}
+
+	statusSchedule.MondayStart = mondayStart
+	statusSchedule.MondayEnd = mondayEnd
+	statusSchedule.TuesdayStart = tuesdayStart
+	statusSchedule.TuesdayEnd = tuesdayEnd
+	statusSchedule.WednesdayStart = wednesdayStart
+	statusSchedule.WednesdayEnd = wednesdayEnd
+	statusSchedule.ThursdayStart = thursdayStart
+	statusSchedule.ThursdayEnd = thursdayEnd
+	statusSchedule.FridayStart = fridayStart
+	statusSchedule.FridayEnd = fridayEnd
+	statusSchedule.SaturdayStart = saturdayStart
+	statusSchedule.SaturdayEnd = saturdayEnd
+	statusSchedule.SundayStart = sundayStart
+	statusSchedule.SundayEnd = sundayEnd
+	statusSchedule.Mode = mode
+
+	a.SaveStatusSchedule(statusSchedule)
+}
+
+func (a *App) SetStatusDoNotDisturbScheduled(userID string) {
+	if !*a.Config().ServiceSettings.EnableUserStatuses {
+		return
+	}
+
+	status, err := a.GetStatus(userID)
+
+	if err != nil {
+		return
+	}
+
+	status.Status = model.STATUS_DND
+	status.Manual = true
 
 	a.SaveAndBroadcastStatus(status)
 }
@@ -331,6 +437,12 @@ func (a *App) SaveAndBroadcastStatus(status *model.Status) {
 	a.BroadcastStatus(status)
 }
 
+func (a *App) SaveStatusSchedule(statusSchedule *model.StatusSchedule) {
+	if err := a.Srv().Store.StatusSchedule().SaveOrUpdate(statusSchedule); err != nil {
+		mlog.Warn("Failed to save status schedule", mlog.String("user_id", statusSchedule.UserId), mlog.Err(err))
+	}
+}
+
 func (a *App) SetStatusOutOfOffice(userID string) {
 	if !*a.Config().ServiceSettings.EnableUserStatuses {
 		return
@@ -381,6 +493,22 @@ func (a *App) GetStatus(userID string) (*model.Status, *model.AppError) {
 	}
 
 	return status, nil
+}
+
+func (a *App) GetStatusSchedule(userID string) (*model.StatusSchedule, *model.AppError) {
+
+	statusSchedule, err := a.Srv().Store.StatusSchedule().Get(userID)
+	if err != nil {
+		var nfErr *store.ErrNotFound
+		switch {
+		case errors.As(err, &nfErr):
+			return nil, model.NewAppError("GetStatusSchedule", "app.status.get.missing.app_error", nil, nfErr.Error(), http.StatusNotFound)
+		default:
+			return nil, model.NewAppError("GetStatusSchedule", "app.status.get.app_error", nil, err.Error(), http.StatusInternalServerError)
+		}
+	}
+
+	return statusSchedule, nil
 }
 
 func (a *App) IsUserAway(lastActivityAt int64) bool {

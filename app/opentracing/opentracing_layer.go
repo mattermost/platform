@@ -8749,6 +8749,28 @@ func (a *OpenTracingAppLayer) GetStatusFromCache(userID string) *model.Status {
 	return resultVar0
 }
 
+func (a *OpenTracingAppLayer) GetStatusSchedule(userID string) (*model.StatusSchedule, *model.AppError) {
+	origCtx := a.ctx
+	span, newCtx := tracing.StartSpanWithParentByContext(a.ctx, "app.GetStatusSchedule")
+
+	a.ctx = newCtx
+	a.app.Srv().Store.SetContext(newCtx)
+	defer func() {
+		a.app.Srv().Store.SetContext(origCtx)
+		a.ctx = origCtx
+	}()
+
+	defer span.Finish()
+	resultVar0, resultVar1 := a.app.GetStatusSchedule(userID)
+
+	if resultVar1 != nil {
+		span.LogFields(spanlog.Error(resultVar1))
+		ext.Error.Set(span, true)
+	}
+
+	return resultVar0, resultVar1
+}
+
 func (a *OpenTracingAppLayer) GetStatusesByIds(userIDs []string) (map[string]interface{}, *model.AppError) {
 	origCtx := a.ctx
 	span, newCtx := tracing.StartSpanWithParentByContext(a.ctx, "app.GetStatusesByIds")
@@ -10599,6 +10621,23 @@ func (a *OpenTracingAppLayer) ImportPermissions(jsonl io.Reader) error {
 		span.LogFields(spanlog.Error(resultVar0))
 		ext.Error.Set(span, true)
 	}
+
+	return resultVar0
+}
+
+func (a *OpenTracingAppLayer) InTimeSpan(start time.Time, end time.Time, check time.Time) bool {
+	origCtx := a.ctx
+	span, newCtx := tracing.StartSpanWithParentByContext(a.ctx, "app.InTimeSpan")
+
+	a.ctx = newCtx
+	a.app.Srv().Store.SetContext(newCtx)
+	defer func() {
+		a.app.Srv().Store.SetContext(origCtx)
+		a.ctx = origCtx
+	}()
+
+	defer span.Finish()
+	resultVar0 := a.app.InTimeSpan(start, end, check)
 
 	return resultVar0
 }
@@ -13606,6 +13645,21 @@ func (a *OpenTracingAppLayer) SaveSharedChannelRemote(remote *model.SharedChanne
 	return resultVar0, resultVar1
 }
 
+func (a *OpenTracingAppLayer) SaveStatusSchedule(statusSchedule *model.StatusSchedule) {
+	origCtx := a.ctx
+	span, newCtx := tracing.StartSpanWithParentByContext(a.ctx, "app.SaveStatusSchedule")
+
+	a.ctx = newCtx
+	a.app.Srv().Store.SetContext(newCtx)
+	defer func() {
+		a.app.Srv().Store.SetContext(origCtx)
+		a.ctx = origCtx
+	}()
+
+	defer span.Finish()
+	a.app.SaveStatusSchedule(statusSchedule)
+}
+
 func (a *OpenTracingAppLayer) SaveUserTermsOfService(userID string, termsOfServiceId string, accepted bool) *model.AppError {
 	origCtx := a.ctx
 	span, newCtx := tracing.StartSpanWithParentByContext(a.ctx, "app.SaveUserTermsOfService")
@@ -15005,6 +15059,36 @@ func (a *OpenTracingAppLayer) SetStatusDoNotDisturb(userID string) {
 	a.app.SetStatusDoNotDisturb(userID)
 }
 
+func (a *OpenTracingAppLayer) SetStatusDoNotDisturbSchedule(userId string, currentDayOfTheWeek string, currentTime string) {
+	origCtx := a.ctx
+	span, newCtx := tracing.StartSpanWithParentByContext(a.ctx, "app.SetStatusDoNotDisturbSchedule")
+
+	a.ctx = newCtx
+	a.app.Srv().Store.SetContext(newCtx)
+	defer func() {
+		a.app.Srv().Store.SetContext(origCtx)
+		a.ctx = origCtx
+	}()
+
+	defer span.Finish()
+	a.app.SetStatusDoNotDisturbSchedule(userId, currentDayOfTheWeek, currentTime)
+}
+
+func (a *OpenTracingAppLayer) SetStatusDoNotDisturbScheduled(userID string) {
+	origCtx := a.ctx
+	span, newCtx := tracing.StartSpanWithParentByContext(a.ctx, "app.SetStatusDoNotDisturbScheduled")
+
+	a.ctx = newCtx
+	a.app.Srv().Store.SetContext(newCtx)
+	defer func() {
+		a.app.Srv().Store.SetContext(origCtx)
+		a.ctx = origCtx
+	}()
+
+	defer span.Finish()
+	a.app.SetStatusDoNotDisturbScheduled(userID)
+}
+
 func (a *OpenTracingAppLayer) SetStatusDoNotDisturbTimed(userId string, endtime int64) {
 	origCtx := a.ctx
 	span, newCtx := tracing.StartSpanWithParentByContext(a.ctx, "app.SetStatusDoNotDisturbTimed")
@@ -15078,6 +15162,21 @@ func (a *OpenTracingAppLayer) SetStatusOutOfOffice(userID string) {
 
 	defer span.Finish()
 	a.app.SetStatusOutOfOffice(userID)
+}
+
+func (a *OpenTracingAppLayer) SetStatusSchedule(userId string, mondayStart string, mondayEnd string, tuesdayStart string, tuesdayEnd string, wednesdayStart string, wednesdayEnd string, thursdayStart string, thursdayEnd string, fridayStart string, fridayEnd string, saturdayStart string, saturdayEnd string, sundayStart string, sundayEnd string, mode int64) {
+	origCtx := a.ctx
+	span, newCtx := tracing.StartSpanWithParentByContext(a.ctx, "app.SetStatusSchedule")
+
+	a.ctx = newCtx
+	a.app.Srv().Store.SetContext(newCtx)
+	defer func() {
+		a.app.Srv().Store.SetContext(origCtx)
+		a.ctx = origCtx
+	}()
+
+	defer span.Finish()
+	a.app.SetStatusSchedule(userId, mondayStart, mondayEnd, tuesdayStart, tuesdayEnd, wednesdayStart, wednesdayEnd, thursdayStart, thursdayEnd, fridayStart, fridayEnd, saturdayStart, saturdayEnd, sundayStart, sundayEnd, mode)
 }
 
 func (a *OpenTracingAppLayer) SetTeamIcon(teamID string, imageData *multipart.FileHeader) *model.AppError {

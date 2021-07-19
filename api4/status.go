@@ -13,6 +13,9 @@ func (api *API) InitStatus() {
 	api.BaseRoutes.User.Handle("/status", api.ApiSessionRequired(getUserStatus)).Methods("GET")
 	api.BaseRoutes.Users.Handle("/status/ids", api.ApiSessionRequired(getUserStatusesByIds)).Methods("POST")
 	api.BaseRoutes.User.Handle("/status", api.ApiSessionRequired(updateUserStatus)).Methods("PUT")
+	// DND Schedule update
+	api.BaseRoutes.User.Handle("/status/schedule", api.ApiSessionRequired(getUserStatusSchedule)).Methods("PUT")
+	api.BaseRoutes.User.Handle("/status/schedule/periods", api.ApiSessionRequired(updateStatusSchedule)).Methods("PUT")
 	api.BaseRoutes.User.Handle("/status/custom", api.ApiSessionRequired(updateUserCustomStatus)).Methods("PUT")
 	api.BaseRoutes.User.Handle("/status/custom", api.ApiSessionRequired(removeUserCustomStatus)).Methods("DELETE")
 
@@ -117,6 +120,63 @@ func updateUserStatus(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	getUserStatus(c, w, r)
+}
+
+func getUserStatusSchedule(c *Context, w http.ResponseWriter, r *http.Request) {
+	c.RequireUserId()
+	if c.Err != nil {
+		return
+	}
+
+	statusSchedule := model.StatusScheduleFromJson(r.Body)
+	if statusSchedule == nil {
+		c.SetInvalidParam("statusSchedule")
+		return
+	}
+
+	// The user being updated in the payload must be the same one as indicated in the URL.
+	if statusSchedule.UserId != c.Params.UserId {
+		c.SetInvalidParam("user_id")
+		return
+	}
+
+	if !c.App.SessionHasPermissionToUser(*c.AppContext.Session(), c.Params.UserId) {
+		c.SetPermissionError(model.PERMISSION_EDIT_OTHER_USERS)
+		return
+	}
+
+	c.App.SetStatusDoNotDisturbSchedule(statusSchedule.UserId, statusSchedule.DayOfTheWeek, statusSchedule.CurrentTime)
+
+	ReturnStatusOK(w)
+}
+
+func updateStatusSchedule(c *Context, w http.ResponseWriter, r *http.Request) {
+	c.RequireUserId()
+	if c.Err != nil {
+		return
+	}
+
+	statusSchedule := model.StatusScheduleFromJson(r.Body)
+
+	if statusSchedule == nil {
+		c.SetInvalidParam("statusSchedule")
+		return
+	}
+
+	// The user being updated in the payload must be the same one as indicated in the URL.
+	if statusSchedule.UserId != c.Params.UserId {
+		c.SetInvalidParam("user_id")
+		return
+	}
+
+	if !c.App.SessionHasPermissionToUser(*c.AppContext.Session(), c.Params.UserId) {
+		c.SetPermissionError(model.PERMISSION_EDIT_OTHER_USERS)
+		return
+	}
+
+	c.App.SetStatusSchedule(c.Params.UserId, statusSchedule.MondayStart, statusSchedule.MondayEnd, statusSchedule.TuesdayStart, statusSchedule.TuesdayEnd, statusSchedule.WednesdayStart, statusSchedule.WednesdayEnd, statusSchedule.ThursdayStart, statusSchedule.ThursdayEnd, statusSchedule.FridayStart, statusSchedule.FridayEnd, statusSchedule.SaturdayStart, statusSchedule.SaturdayEnd, statusSchedule.SundayStart, statusSchedule.SundayEnd, statusSchedule.Mode)
+
+	ReturnStatusOK(w)
 }
 
 func updateUserCustomStatus(c *Context, w http.ResponseWriter, r *http.Request) {

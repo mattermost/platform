@@ -1090,6 +1090,27 @@ func upgradeDatabaseToVersion536(sqlStore *SqlStore) {
 		sqlStore.CreateColumnIfNotExists("SharedChannelRemotes", "LastPostUpdateAt", "bigint", "bigint", "0")
 		sqlStore.CreateColumnIfNotExists("SharedChannelRemotes", "LastPostId", "VARCHAR(26)", "VARCHAR(26)", "")
 
+		// timed dnd status support
+		sqlStore.CreateColumnIfNotExistsNoDefault("Status", "DNDEndTime", "BIGINT", "BIGINT")
+		sqlStore.CreateColumnIfNotExistsNoDefault("Status", "PrevStatus", "VARCHAR(32)", "VARCHAR(32)")
+		// custom dnd status support
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "MondayStart", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "MondayEnd", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "TuesdayStart", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "TuesdayEnd", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "WednesdayStart", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "WednesdayEnd", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "ThursdayStart", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "ThursdayEnd", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "FridayStart", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "FridayEnd", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "SaturdayStart", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "SaturdayEnd", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "SundayStart", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "SundayEnd", "VARCHAR(32)", "VARCHAR(32)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "Mode", "BIGINT", "BIGINT")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "CurrentTime", "VARCHAR(16)", "VARCHAR(16)")
+		sqlStore.CreateColumnIfNotExistsNoDefault("StatusSchedule", "DayOfTheWeek", "VARCHAR(16)", "VARCHAR(16)")
 		saveSchemaVersion(sqlStore, Version5360)
 	}
 }

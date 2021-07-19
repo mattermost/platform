@@ -742,6 +742,7 @@ type AppIface interface {
 	GetSiteURL() string
 	GetStatus(userID string) (*model.Status, *model.AppError)
 	GetStatusFromCache(userID string) *model.Status
+	GetStatusSchedule(userID string) (*model.StatusSchedule, *model.AppError)
 	GetStatusesByIds(userIDs []string) (map[string]interface{}, *model.AppError)
 	GetSubscriptionStats() (*model.SubscriptionStats, *model.AppError)
 	GetSystemBot() (*model.Bot, *model.AppError)
@@ -823,6 +824,7 @@ type AppIface interface {
 	ImageProxyAdder() func(string) string
 	ImageProxyRemover() (f func(string) string)
 	ImportPermissions(jsonl io.Reader) error
+	InTimeSpan(start, end, check time.Time) bool
 	InitPlugins(c *request.Context, pluginDir, webappPluginDir string)
 	InstallPluginFromData(data model.PluginEventData)
 	InvalidateAllEmailInvites() *model.AppError
@@ -950,6 +952,7 @@ type AppIface interface {
 	SaveReactionForPost(c *request.Context, reaction *model.Reaction) (*model.Reaction, *model.AppError)
 	SaveSharedChannel(sc *model.SharedChannel) (*model.SharedChannel, error)
 	SaveSharedChannelRemote(remote *model.SharedChannelRemote) (*model.SharedChannelRemote, error)
+	SaveStatusSchedule(statusSchedule *model.StatusSchedule)
 	SaveUserTermsOfService(userID, termsOfServiceId string, accepted bool) *model.AppError
 	SchemesIterator(scope string, batchSize int) func() []*model.Scheme
 	SearchArchivedChannels(teamID string, term string, userID string) (*model.ChannelList, *model.AppError)
@@ -1011,9 +1014,12 @@ type AppIface interface {
 	SetServer(srv *Server)
 	SetStatusAwayIfNeeded(userID string, manual bool)
 	SetStatusDoNotDisturb(userID string)
+	SetStatusDoNotDisturbSchedule(userId, currentDayOfTheWeek, currentTime string)
+	SetStatusDoNotDisturbScheduled(userID string)
 	SetStatusOffline(userID string, manual bool)
 	SetStatusOnline(userID string, manual bool)
 	SetStatusOutOfOffice(userID string)
+	SetStatusSchedule(userId, mondayStart, mondayEnd, tuesdayStart, tuesdayEnd, wednesdayStart, wednesdayEnd, thursdayStart, thursdayEnd, fridayStart, fridayEnd, saturdayStart, saturdayEnd, sundayStart, sundayEnd string, mode int64)
 	SetTeamIcon(teamID string, imageData *multipart.FileHeader) *model.AppError
 	SetTeamIconFromFile(team *model.Team, file io.Reader) *model.AppError
 	SetTeamIconFromMultiPartFile(teamID string, file multipart.File) *model.AppError
