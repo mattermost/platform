@@ -973,7 +973,7 @@ func TestRemoveDuplicateStrings(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		actual := RemoveDuplicateStrings(tc.Input)
-		require.Equalf(t, actual, tc.Result, "case: %v\tshould returned: %#v", tc, tc.Result)
+		RemoveDuplicateStrings(tc.Input)
+		require.Equalf(t, tc.Result, tc.Input, "case: %v\tshould returned: %#v", tc, tc.Result)
 	}
 }

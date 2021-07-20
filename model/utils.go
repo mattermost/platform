@@ -529,7 +529,7 @@ func RemoveDuplicateStrings(in []string) {
 		j++
 		in[j] = in[i]
 	}
-	in = in[:j+1]
+	in = in[:j+1] //nolint:staticcheck
 }
 
 func GetPreferredTimezone(timezone StringMap) string {
