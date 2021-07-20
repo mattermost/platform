@@ -234,7 +234,7 @@ func (a *App) getImagesForPost(post *model.Post, imageURLs []string, isNewPost b
 
 	// Removing duplicates isn't strictly since images is a map, but it feels safer to do it beforehand
 	if len(imageURLs) > 1 {
-		imageURLs = model.RemoveDuplicateStrings(imageURLs)
+		model.RemoveDuplicateStrings(imageURLs)
 	}
 
 	for _, imageURL := range imageURLs {
@@ -286,7 +286,7 @@ func getEmojiNamesForPost(post *model.Post, reactions []*model.Reaction) []strin
 	}
 
 	// Remove duplicates
-	names = model.RemoveDuplicateStrings(names)
+	model.RemoveDuplicateStrings(names)
 
 	return names
 }
