@@ -512,11 +512,13 @@ func IsValidId(value string) bool {
 	return true
 }
 
-func RemoveDuplicateStrings(in []string) []string {
+// RemoveDuplicateStrings does an in-place removal of duplicate strings
+// from the input slice.
+func RemoveDuplicateStrings(in []string) {
 	// In-place de-dup.
 	// Copied from https://github.com/golang/go/wiki/SliceTricks#in-place-deduplicate-comparable
 	if len(in) == 0 {
-		return in
+		return
 	}
 	sort.Strings(in)
 	j := 0
@@ -525,12 +527,9 @@ func RemoveDuplicateStrings(in []string) []string {
 			continue
 		}
 		j++
-		// preserve the original data
-		// in[i], in[j] = in[j], in[i]
-		// only set what is required
 		in[j] = in[i]
 	}
-	return in[:j+1]
+	in = in[:j+1]
 }
 
 func GetPreferredTimezone(timezone StringMap) string {

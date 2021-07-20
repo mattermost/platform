@@ -1899,7 +1899,9 @@ func (a *App) GetChannelMembersTimezones(channelID string) ([]string, *model.App
 		timezones = append(timezones, model.GetPreferredTimezone(membersTimezone))
 	}
 
-	return model.RemoveDuplicateStrings(timezones), nil
+	model.RemoveDuplicateStrings(timezones)
+
+	return timezones, nil
 }
 
 func (a *App) GetChannelMembersByIds(channelID string, userIDs []string) (*model.ChannelMembers, *model.AppError) {
